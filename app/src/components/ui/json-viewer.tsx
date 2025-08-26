@@ -47,7 +47,7 @@ const JsonNode: React.FC<JsonNodeProps> = ({ data, keyName, level = 0, isLast = 
         const punctuationClasses = isError ? "text-destructive" : "text-gray-600";
 
         return (
-            <div style={{ marginLeft: indent }} className="font-btr-code text-sm break-all">
+            <div style={{ marginLeft: indent }} className="font-btr-code text-sm break-all relative left-6">
                 {keyName && (
                     <>
                         <span className={cn(keyClasses, "font-btr-code")}>"{keyName}"</span>
@@ -55,7 +55,7 @@ const JsonNode: React.FC<JsonNodeProps> = ({ data, keyName, level = 0, isLast = 
                     </>
                 )}
                 <span className="font-btr-code">{renderValue(data)}</span>
-                {!isLast && <span className={cn(punctuationClasses, "font-btr-code")}>,</span>}
+                {!isLast && <span className={cn(punctuationClasses, "font-btr-code relative")}>,</span>}
             </div>
         );
     }
@@ -84,7 +84,7 @@ const JsonNode: React.FC<JsonNodeProps> = ({ data, keyName, level = 0, isLast = 
                 )}
                 {keyName && (
                     <>
-                        <span className={cn(keyClasses, "font-btr-code")}>"{keyName}"</span>
+                        <span data-empty={isEmpty} className={cn(keyClasses, "font-btr-code relative data-[empty=true]:left-6")}>"{keyName}"</span>
                         <span className={cn(punctuationClasses, "font-btr-code")}>: </span>
                     </>
                 )}
@@ -115,7 +115,7 @@ const JsonNode: React.FC<JsonNodeProps> = ({ data, keyName, level = 0, isLast = 
                             isError={isError}
                         />
                     ))}
-                    <div style={{ marginLeft: indent }} className={cn(punctuationClasses, "font-btr-code")}>
+                    <div style={{ marginLeft: indent }} className={cn(punctuationClasses, "font-btr-code relative  left-6")}>
                         {isArray ? ']' : '}'}
                         {!isLast && <span className="font-btr-code">,</span>}
                     </div>

@@ -1,6 +1,6 @@
 import { useGlobalState } from "@/hooks/use-global-state"
 import { useProjects } from "@/hooks/use-projects"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import {
     FileCodeIcon,
     FileStack,
@@ -12,15 +12,19 @@ import {
     RocketIcon,
     SparklesIcon,
     GithubIcon,
-    Cannabis
+    Cannabis,
+    Unplug,
+    Plug,
+    PartyPopper
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Link } from "react-router"
-import { ConnectButton, useConnection, useProfileModal } from "@arweave-wallet-kit/react"
+import { ConnectButton, useActiveAddress, useConnection, useProfileModal } from "@arweave-wallet-kit/react"
 import HotkeyReference from "./hotkey-reference"
 import { MenubarShortcut } from "./ui/menubar"
 import { getHotkeyDisplay, HOTKEYS } from "@/lib/hotkeys"
+import { shortenAddress } from "@/lib/utils"
 
 const emoticons = [
     "(^･o･^)ﾉ' ",
@@ -57,8 +61,9 @@ export default function Welcome() {
     const globalState = useGlobalState()
     const projects = useProjects()
     const [randomWord] = useState(() => emoticons[Math.floor(Math.random() * emoticons.length)])
-    const { connected, connect } = useConnection()
+    const { connected, connect, disconnect } = useConnection()
     const { setOpen } = useProfileModal()
+    const address = useActiveAddress()
 
     const handleQuickAction = (action: string) => {
         switch (action) {
@@ -126,14 +131,15 @@ export default function Welcome() {
                                 <action.icon size={18} /> {action.title}
                             </Button>
                         ))} */}
-                        <Button variant="link" className="justify-center w-fit items-center h-7 text-foreground gap-2 px-0" onClick={() => handleQuickAction("new-project")}>
+                        {<Button variant="link" data-connected={connected} className="justify-center disabled:opacity-100 w-fit text-primary hover:text-primary data-[connected=true]:text-foreground data-[connected=true]:hover:text-primary items-center h-7 rounded-sm gap-2 !px-1.5 ml-1.5 " onClick={async () => { if (connected) { setOpen(true) } else { try { await disconnect() } finally { await connect() } } }}>
+                            {!connected ? <><Unplug size={20} /> Connect Wallet</> : <><PartyPopper size={20} className="" /> {address ? shortenAddress(address) : "Connecting..."}</>}
+                        </Button>}
+                        <Button variant="link" className="justify-center w-fit items-center h-7 text-foreground hover:text-primary gap-2 px-0" onClick={() => handleQuickAction("new-project")}>
                             <PlusSquare size={18} /> New Project
                         </Button>
-                        <Button variant="link" className="justify-center w-fit items-center h-7 text-foreground gap-2 px-0" onClick={() => handleQuickAction("all-projects")}>
+                        <Button variant="link" className="justify-center w-fit items-center h-7 text-foreground hover:text-primary gap-2 px-0" onClick={() => handleQuickAction("all-projects")}>
                             <FileStack size={18} /> All Projects
                         </Button>
-                        {/* {!connected && <ConnectButton className="!rounded-md !w-fit !p-0 !bg-primary text-black ml-3 mt-4" />} */}
-                        {!connected && <Button className="w-fit ml-3 mt-4" onClick={() => connect()}>Connect Wallet</Button>}
                     </div>
                 </div>
 
@@ -190,11 +196,11 @@ export default function Welcome() {
                     <div className="space-y-1">
                         <div className="flex items-center gap-2 px-2 py-1">
                             <SparklesIcon size={12} className="text-primary opacity-60" />
-                            <span className="text-xs text-foreground">Press <kbd className="bg-muted/60 p-0.5 px-1 rounded-sm"><MenubarShortcut className="text-foreground">{getHotkeyDisplay(HOTKEYS.NEW_PROJECT.key)}</MenubarShortcut></kbd> to create a new project</span>
+                            <span className="text-xs text-foreground">Check keybinds with <kbd className="bg-muted/60 p-0.5 px-1 rounded-sm"><MenubarShortcut className="text-foreground">{getHotkeyDisplay(HOTKEYS.SHOW_SHORTCUTS.key)}</MenubarShortcut></kbd></span>
                         </div>
                         <div className="flex items-center gap-2 px-2 py-1">
                             <SparklesIcon size={12} className="text-primary opacity-60" />
-                            <span className="text-xs text-foreground">Check keybinds with <kbd className="bg-muted/60 p-0.5 px-1 rounded-sm"><MenubarShortcut className="text-foreground">{getHotkeyDisplay(HOTKEYS.SHOW_SHORTCUTS.key)}</MenubarShortcut></kbd></span>
+                            <span className="text-xs text-foreground">Press <kbd className="bg-muted/60 p-0.5 px-1 rounded-sm"><MenubarShortcut className="text-foreground">{getHotkeyDisplay(HOTKEYS.NEW_PROJECT.key)}</MenubarShortcut></kbd> to create a new project</span>
                         </div>
                         <div className="flex items-center gap-2 px-2 py-1">
                             <SparklesIcon size={12} className="text-primary opacity-60" />

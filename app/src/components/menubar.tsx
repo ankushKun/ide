@@ -481,6 +481,11 @@ export default function Menubar() {
         setIsShortcutsOpen(true)
     }
 
+    const handleShowCommands = () => {
+        console.log("show commands")
+        // setIsCommandsOpen(true)
+    }
+
     const handleShowAbout = () => {
         // TODO: Implement about modal
         toast.info("About BetterIDEa coming soon!")
@@ -491,6 +496,7 @@ export default function Menubar() {
         newProject: handleNewProject,
         openProject: handleOpenProject,
         saveProject: handleSaveProject,
+        showCommands: handleShowCommands,
         closeProject: handleCloseProject,
         importProject: handleImportProject,
         exportProject: handleExportProject,

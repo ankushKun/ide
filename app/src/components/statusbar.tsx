@@ -1,6 +1,6 @@
 import { useActiveAddress, useConnection, useProfileModal } from "@arweave-wallet-kit/react";
 import { Button } from "./ui/button";
-import { Database, Wallet, Wallet2, Copy } from "lucide-react";
+import { Database, Wallet, Wallet2, Copy, Unplug, Plug, PartyPopper } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
 import { cn, stripAnsiCodes } from "@/lib/utils";
@@ -190,23 +190,11 @@ export default function Statusbar() {
         <div className="border-t h-[20px] text-xs flex items-center overflow-clip px-1 pr-3 bg-background/50 backdrop-blur-sm">
             {/* Left Section - Connection Status */}
             <Button
-                className={cn("h-full px-2 gap-1.5 text-xs font-medium rounded-none", connected && "bg-background text-foreground hover:text-background")}
-                onClick={() => {
-                    if (connected && address) {
-                        setOpen(true)
-                    } else {
-                        connect();
-                    }
-                }}
-                onContextMenu={(e) => {
-                    e.preventDefault();
-                    if (connected) {
-                        disconnect();
-                    }
-                }}
+                className={cn("h-full !px-2 gap-1.5 text-xs font-medium rounded-none", connected && "bg-background text-foreground hover:text-background")}
+                onClick={async () => { if (connected) { setOpen(true) } else { try { await disconnect() } finally { await connect() } } }}
                 id="connect-btn"
             >
-                <Wallet className={cn("w-3 h-3")} strokeWidth={1.5} />
+                {!connected ? <Unplug className={cn("w-3 h-3")} strokeWidth={1.5} /> : <PartyPopper className={cn("")} strokeWidth={1.5} />}
                 <span className={cn("font-btr-code text-xs")}>
                     {connected ? shortenId(address || "") : "connect"}
                 </span>

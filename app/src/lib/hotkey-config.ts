@@ -25,7 +25,7 @@ export const HOTKEY_CONFIG: SimpleHotkeyConfig[] = [
     },
     {
         action: 'openProject',
-        key: 'Ctrl+Shift+O',  // Will show as ⌘+Shift+O on Mac
+        key: 'Alt+Shift+O',  // Will show as ⌘+Shift+O on Mac
         description: 'Open project browser',
         category: 'File'
     },
@@ -40,6 +40,12 @@ export const HOTKEY_CONFIG: SimpleHotkeyConfig[] = [
         key: 'Ctrl+Shift+I',  // Will show as ⌘+I on Mac
         description: 'Import project',
         category: 'File'
+    },
+    {
+        action: 'showCommands',
+        key: 'Ctrl+Shift+P',  // Will show as ⌘+I on Mac
+        description: 'Show commands',
+        category: 'App'
     },
     {
         action: 'exportProject',
@@ -99,7 +105,7 @@ export const HOTKEY_CONFIG: SimpleHotkeyConfig[] = [
     // Help
     {
         action: 'showShortcuts',
-        key: 'Ctrl+K',  // Will show as ⌘+/ on Mac
+        key: 'Ctrl+/',  // Will show as ⌘+/ on Mac
         description: 'Show keyboard shortcuts',
         category: 'Help'
     }

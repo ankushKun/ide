@@ -12,6 +12,7 @@ import { MainnetAO, type Tag } from "@/lib/ao";
 import { useSettings } from "@/hooks/use-settings";
 import React from "react";
 import JsonViewer from "./ui/json-viewer";
+import OutputViewer from "./ui/output-viewer";
 
 interface Commitment {
     bundle: string;
@@ -36,6 +37,7 @@ interface InboxItem {
     name?: string;
     module?: string;
     commitments?: Record<string, Commitment>;
+    body?: string;
     [key: string]: any;
 }
 
@@ -297,6 +299,24 @@ export default function Inbox() {
                                 </CardContent>
                             </Card>
                         )}
+
+                        {
+                            message.body && (
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="text-sm flex items-center gap-2">
+                                            <FileText className="h-4 w-4" />
+                                            Message Body
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="space-y-2">
+                                            <OutputViewer output={message.body} />
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            )
+                        }
 
                         {/* Commitments */}
                         {message.commitments && Object.keys(message.commitments).length > 0 && (

@@ -55,7 +55,8 @@ const ACTION_TO_KEY_MAP: Record<string, string> = {
     'toggleSidebar': 'TOGGLE_SIDEBAR',
     'toggleTerminal': 'TOGGLE_TERMINAL',
     'openSettings': 'SETTINGS',
-    'showShortcuts': 'SHOW_SHORTCUTS'
+    'showShortcuts': 'SHOW_SHORTCUTS',
+    'showCommands': 'SHOW_COMMANDS'
 }
 
 // Convert config array to keyed object
