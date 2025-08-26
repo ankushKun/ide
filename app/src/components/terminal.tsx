@@ -442,7 +442,9 @@ export default function Terminal() {
             if (!readlineRef.current) return
             while (!readlineRef.current.writeReady()) { }
             if (!process) {
+                readlineRef.current.println("");
                 readlineRef.current.println(ANSI.RESET + ANSI.RED + "[No process found on project]" + ANSI.RESET);
+                readlineRef.current.println(ANSI.RESET + ANSI.RED + "[Go into Settings > Project and set or create a new process]" + ANSI.RESET);
                 return
             }
             const safePrompt = typeof prompt === 'string' && prompt.length > 0 ? prompt : "aos> "

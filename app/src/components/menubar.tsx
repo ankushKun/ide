@@ -51,6 +51,7 @@ import {
 } from "lucide-react"
 import { fetchProjectFromProcess, isValidArweaveId, validateArweaveId } from "@/lib/utils"
 import { useSettings } from "@/hooks/use-settings"
+import { useActiveAddress } from "@arweave-wallet-kit/react"
 
 const link = [
     {
@@ -100,6 +101,7 @@ export default function Menubar() {
     const [previewError, setPreviewError] = useState<string | null>(null)
     const [isShortcutsOpen, setIsShortcutsOpen] = useState(false)
     const settings = useSettings()
+    const address = useActiveAddress()
 
     // Use the Arweave ID validator from utils.ts for process ID validation
     const isValidProcessId = (id: string) => {
@@ -317,7 +319,6 @@ export default function Menubar() {
 
         // Create a copy of the project and clear the process ID
         const projectToImport = { ...projectPreview }
-        projectToImport.process = ""
 
         let name = projectToImport.name
         const existingProject = projects[name]
@@ -327,10 +328,16 @@ export default function Menubar() {
             name = projectToImport.name
         }
 
+        if (projectToImport.ownerAddress != address) {
+            projectToImport.process = ""
+
+        }
+
         projectActions.setProject(projectToImport)
         projectActions.addRecent(name)
         globalActions.setActiveProject(name)
         toast.success(`Project "${name}" imported successfully`)
+
 
         // Reset state
         setProcessId("")
