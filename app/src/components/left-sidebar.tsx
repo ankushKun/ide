@@ -1,6 +1,6 @@
 import { useGlobalState } from "@/hooks/use-global-state"
 import { usePWAInstall } from "@/hooks/use-pwa-install"
-import { Blocks, Bot, Database, Download, EthernetPort, File, Files, FlaskConical, Settings, TestTubeDiagonal } from "lucide-react"
+import { Blocks, Bot, Database, Download, EthernetPort, File, Files, FlaskConical, Settings, TestTubeDiagonal, Waypoints } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "./ui/button"
 import { useEffect, useState } from "react"
@@ -50,7 +50,7 @@ const options: LeftSidebarOptions[] = [
     },
     {
         label: "Relayer",
-        Icon: EthernetPort,
+        Icon: Waypoints,
         id: "relayer",
         onClick: (params: any) => {
 

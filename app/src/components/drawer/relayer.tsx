@@ -19,7 +19,8 @@ import {
     Tag as TagIcon,
     MessageSquare,
     X,
-    EthernetPort
+    EthernetPort,
+    Waypoints
 } from "lucide-react"
 import { MainnetAO, TestnetAO, type Tag } from "@/lib/ao"
 import type { InteractState } from "@/hooks/use-projects"
@@ -248,7 +249,7 @@ const Relayer = memo(function Relayer() {
             <div className="px-3 py-2 border-b border-border/40 bg-sidebar/50">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                        <EthernetPort className="w-4 h-4 text-muted-foreground" />
+                        <Waypoints className="w-4 h-4 text-muted-foreground" />
                         <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                             Relayer
                         </span>
