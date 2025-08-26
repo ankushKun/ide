@@ -580,10 +580,9 @@ export default function Menubar() {
                     <MenubarItem
                         onClick={handleDeleteProject}
                         disabled={!activeProject}
-                        variant="destructive"
-                        className="gap-2 cursor-pointer focus:bg-destructive/10 focus:text-destructive data-[disabled]:opacity-50 data-[disabled]:cursor-not-allowed dark:focus:bg-destructive/20"
+                        className="gap-2 cursor-pointer !text-destructive-foreground hover:!bg-destructive/20"
                     >
-                        <Trash2 className="w-4 h-4 text-destructive" />
+                        <Trash2 className="w-4 h-4 text-destructive-foreground" />
                         Delete Project
                     </MenubarItem>
                     <MenubarSeparator className="bg-border" />
@@ -637,10 +636,9 @@ export default function Menubar() {
                     <MenubarItem
                         onClick={handleDeleteFile}
                         disabled={!activeProject || !activeFile}
-                        variant="destructive"
-                        className="gap-2 cursor-pointer focus:bg-destructive/10 focus:text-destructive data-[disabled]:opacity-50 data-[disabled]:cursor-not-allowed dark:focus:bg-destructive/20"
+                        className="gap-2 cursor-pointer !text-destructive-foreground hover:!bg-destructive/20"
                     >
-                        <Trash2 className="w-4 h-4 text-destructive" />
+                        <Trash2 className="w-4 h-4 text-destructive-foreground" />
                         Delete File
                         <MenubarShortcut className="text-muted-foreground">{getHotkeyDisplay(HOTKEYS.DELETE_FILE.key)}</MenubarShortcut>
                     </MenubarItem>

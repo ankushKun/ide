@@ -13,6 +13,7 @@ import {
 import { useGlobalState } from "@/hooks/use-global-state"
 import { useProjects } from "@/hooks/use-projects"
 import { toast } from "sonner"
+import { Button } from "../ui/button"
 
 export default function DeleteFile() {
     const { activeFile, activeProject, actions: globalActions } = useGlobalState()
@@ -54,10 +55,12 @@ export default function DeleteFile() {
                 <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
                     <AlertDialogAction
+                        asChild
                         onClick={handleDelete}
-                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                     >
-                        Delete
+                        <Button className="ring-1 ring-destructive/50 bg-destructive/20 text-foreground hover:bg-destructive/50">
+                            Delete File
+                        </Button>
                     </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>

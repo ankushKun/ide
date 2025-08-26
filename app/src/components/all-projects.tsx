@@ -1,7 +1,18 @@
+import { useState } from "react"
 import { useGlobalState } from "@/hooks/use-global-state"
 import { useProjects } from "@/hooks/use-projects"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import {
     FileCodeIcon,
     FolderIcon,
@@ -16,6 +27,8 @@ import {
 export default function AllProjects() {
     const globalState = useGlobalState()
     const projects = useProjects()
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+    const [projectToDelete, setProjectToDelete] = useState<string | null>(null)
 
     const handleOpenProject = (projectName: string) => {
         try {
@@ -38,9 +51,16 @@ export default function AllProjects() {
 
     const handleDeleteProject = (projectName: string, e: React.MouseEvent) => {
         e.stopPropagation()
-        if (confirm(`Are you sure you want to delete project "${projectName}"?`)) {
-            projects.actions.deleteProject(projectName)
-            projects.actions.removeRecent(projectName)
+        setProjectToDelete(projectName)
+        setIsDeleteDialogOpen(true)
+    }
+
+    const confirmDeleteProject = () => {
+        if (projectToDelete) {
+            projects.actions.deleteProject(projectToDelete)
+            projects.actions.removeRecent(projectToDelete)
+            setIsDeleteDialogOpen(false)
+            setProjectToDelete(null)
         }
     }
 
@@ -163,6 +183,30 @@ export default function AllProjects() {
                     </div>
                 </div>
             )}
+
+            {/* Delete Project Dialog */}
+            <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Project</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to delete project "{projectToDelete}"? This action cannot be undone.
+                            All files and data in this project will be permanently lost.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            asChild
+                            onClick={confirmDeleteProject}
+                        >
+                            <Button className="ring-1 ring-destructive/50 bg-destructive/20 text-foreground hover:bg-destructive/50">
+                                Delete Project
+                            </Button>
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     )
 }
