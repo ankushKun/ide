@@ -427,7 +427,7 @@ export default function Settings() {
                                         <div className="flex space-x-2">
                                             <Input
                                                 id="hb-url"
-                                                placeholder="https://hb.arnode.asia"
+                                                placeholder="https://forward.computer"
                                                 value={customHbUrl}
                                                 onChange={(e) => setCustomHbUrl(e.target.value)}
                                                 className="bg-background/50 border-border/60 text-sm font-btr-code"

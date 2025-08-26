@@ -17,7 +17,7 @@ console.log("ADDRESS: ", address, "\n\n\n\n")
 
 // const jwk = await ar.wallets.generate()
 
-const hbUrl = "https://hb.arnode.asia"
+const hbUrl = "https://tee-3.forward.computer"
 const gatewayUrl = "https://arnode.asia"
 const hb_operator = "CUO_Jtx-J9Ph4NVKY_Bgii4HSUwK3NbdaIlPDSiy8Cs"
 const hb_authority = hb_operator + ',fcoN_xJeisVsPXA-trzVAuIiqO3ydLQxM-L4XbrQKzY'
