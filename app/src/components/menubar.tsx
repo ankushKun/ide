@@ -111,7 +111,7 @@ export default function Menubar() {
                 toast.error(<>Project "{activeProject}" is not owned by your wallet.<br />Please switch to the wallet with address {activeProjectData.ownerAddress}</>, { richColors: true })
             }
         }
-    }, [activeProjectData])
+    }, [activeProjectData, address])
 
     // Use the Arweave ID validator from utils.ts for process ID validation
     const isValidProcessId = (id: string) => {
