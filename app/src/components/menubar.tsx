@@ -102,6 +102,16 @@ export default function Menubar() {
     const [isShortcutsOpen, setIsShortcutsOpen] = useState(false)
     const settings = useSettings()
     const address = useActiveAddress()
+    // active project data
+    const activeProjectData = useProjects(p => p.projects[activeProject])
+
+    useEffect(() => {
+        if (activeProjectData) {
+            if (activeProjectData.ownerAddress != address) {
+                toast.error(<>Project "{activeProject}" is not owned by your wallet.<br />Please switch to the wallet with address {activeProjectData.ownerAddress}</>, { richColors: true })
+            }
+        }
+    }, [activeProjectData])
 
     // Use the Arweave ID validator from utils.ts for process ID validation
     const isValidProcessId = (id: string) => {
