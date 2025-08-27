@@ -31,7 +31,7 @@ export class MainnetAO {
     private signer?: any;
 
     constructor(params: MainnetOptions) {
-        this.hbUrl = params.HB_URL || "https://scheduler.forward.computer";
+        this.hbUrl = params.HB_URL || "https://hb.arnode.asia";
         this.gatewayUrl = params.GATEWAY_URL || "https://arweave.net";
         this.signer = params.signer;
     }

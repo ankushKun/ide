@@ -115,11 +115,48 @@ export default function Terminal() {
     const resizeObserverRef = useRef<ResizeObserver | null>(null)
     const [isReady, setIsReady] = useState(false)
     const [prompt, setPrompt] = useState("aos> ")
-    const [activeFile, setActiveFile] = useState<File | null>(null)
-
     // Terminal state management
     const { addTerminalEntry, setTerminalPrompt, clearTerminalHistory, getTerminalState, processQueue, setActiveFile: setTerminalActiveFile } = useTerminalState(s => s.actions)
-    const terminalState = process ? getTerminalState(process) : { history: [], prompt: "aos> " }
+    const terminalState = process ? getTerminalState(process) : { history: [], prompt: "aos> ", activeFile: null }
+    const activeFile = terminalState.activeFile
+
+    // Validation function to check if terminal state is valid
+    const validateTerminalState = useCallback(() => {
+        if (!process || !project) return true
+
+        const currentTerminalState = getTerminalState(process)
+        const activeFile = currentTerminalState.activeFile
+
+        // If no active file in terminal state, it's valid
+        if (!activeFile || !activeFile.name) return true
+
+        // Check if the file still exists in the project
+        const projectFile = project.files[activeFile.name]
+        if (!projectFile) {
+            console.log(`Terminal validation: File ${activeFile.name} no longer exists in project`)
+            return false
+        }
+
+        // Check if the process ID matches
+        const currentFileProcess = projectFile.process || project.process
+        const terminalFileProcess = activeFile.process || project.process
+
+        if (currentFileProcess !== terminalFileProcess) {
+            console.log(`Terminal validation: Process ID mismatch for ${activeFile.name}. Current: ${currentFileProcess}, Terminal: ${terminalFileProcess}`)
+            return false
+        }
+
+        return true
+    }, [process, project, getTerminalState])
+
+    // Reset terminal state when validation fails
+    const resetTerminalStateIfInvalid = useCallback(() => {
+        if (!process || !validateTerminalState()) {
+            console.log('Resetting terminal state due to validation failure')
+            setTerminalActiveFile(process, null)
+            clearTerminalHistory(process)
+        }
+    }, [process, validateTerminalState, setTerminalActiveFile, clearTerminalHistory])
 
     // Function to generate prompt with active file prefix
     const generatePromptWithFile = useCallback((basePrompt: string, activeFile: File | null): string => {
@@ -352,6 +389,30 @@ export default function Terminal() {
             })
         }
     }, [process, theme, getTerminalState, setTerminalPrompt])
+
+    // Validate terminal state when terminal becomes active or project changes
+    useEffect(() => {
+        if (!process || !project || !isReady) return
+
+        // Run validation when terminal becomes active
+        resetTerminalStateIfInvalid()
+    }, [process, project, isReady, resetTerminalStateIfInvalid])
+
+    // Update prompt display when active file changes
+    useEffect(() => {
+        if (!xtermRef.current || !readlineRef.current || !isReady || !process) return
+
+        // Get the current terminal state to check for active file changes
+        const currentTerminalState = getTerminalState(process)
+
+        // Update the displayed prompt to reflect the active file
+        const basePrompt = typeof prompt === 'string' && prompt.length > 0 ? prompt : "aos> "
+        const displayPrompt = generatePromptWithFile(basePrompt, currentTerminalState.activeFile)
+
+        // Clear the current line and write the new prompt
+        xtermRef.current.write('\r' + ' '.repeat(100) + '\r') // Clear current line
+        xtermRef.current.write(displayPrompt)
+    }, [activeFile, prompt, isReady, process, getTerminalState, generatePromptWithFile])
 
     // Get theme configuration
     const getThemeConfig = (currentTheme: string) => {
@@ -762,7 +823,17 @@ export default function Terminal() {
                     if (process) {
                         setTerminalActiveFile(process, file[1])
                     }
-                    setActiveFile(file[1])
+
+                    // Update the prompt display immediately to reflect the new active file
+                    setTimeout(() => {
+                        if (xtermRef.current && readlineRef.current) {
+                            const basePrompt = typeof prompt === 'string' && prompt.length > 0 ? prompt : "aos> "
+                            const newTerminalState = getTerminalState(process)
+                            const displayPrompt = generatePromptWithFile(basePrompt, newTerminalState.activeFile)
+                            xtermRef.current.write('\r' + ' '.repeat(100) + '\r') // Clear current line
+                            xtermRef.current.write(displayPrompt)
+                        }
+                    }, 10)
 
                     // Beautiful success message
                     const successMessage = "\n" + ANSI.RESET + ANSI.GREEN + "✓ Active file selected:" + ANSI.RESET + "\n" +
@@ -785,8 +856,21 @@ export default function Terminal() {
 
                     break;
                 case ".reset":
-                    setTerminalActiveFile(process, null)
-                    setActiveFile(null)
+                    if (process) {
+                        setTerminalActiveFile(process, null)
+                    }
+
+                    // Update the prompt display immediately to reflect no active file
+                    setTimeout(() => {
+                        if (xtermRef.current && readlineRef.current) {
+                            const basePrompt = typeof prompt === 'string' && prompt.length > 0 ? prompt : "aos> "
+                            const newTerminalState = getTerminalState(process)
+                            const displayPrompt = generatePromptWithFile(basePrompt, newTerminalState.activeFile)
+                            xtermRef.current.write('\r' + ' '.repeat(100) + '\r') // Clear current line
+                            xtermRef.current.write(displayPrompt)
+                        }
+                    }, 10)
+
                     readlineRef.current.println(ANSI.RESET + ANSI.GREEN + "✓ Reset terminal active file" + ANSI.RESET)
                     break;
                 default:
@@ -803,7 +887,9 @@ export default function Terminal() {
                     startSpinner();
 
                     try {
-                        const result = await ao.runLua({ processId: (activeFile?.process || process), code: text })
+                        const terminalState = getTerminalState(process)
+                        const activeFileProcessId = terminalState.activeFile?.process
+                        const result = await ao.runLua({ processId: (activeFileProcessId || process), code: text })
                         console.log(result)
 
                         // Stop spinner and clear only the spinner line
@@ -859,7 +945,7 @@ export default function Terminal() {
 
         readLine()
 
-    }, [isReady, readlineRef, xtermRef, prompt, theme, process, addTerminalEntry, setTerminalPrompt, clearTerminalHistory, restoreTerminalHistory, clearTerminalToInitialState, ao, startSpinner, stopSpinner, getTerminalState, generatePromptWithFile, beautifyErrorOutput])
+    }, [isReady, readlineRef, xtermRef, prompt, theme, activeFile, process, addTerminalEntry, setTerminalPrompt, clearTerminalHistory, restoreTerminalHistory, clearTerminalToInitialState, ao, startSpinner, stopSpinner, getTerminalState, generatePromptWithFile, beautifyErrorOutput])
 
     return (
         <div className={cn("h-full w-full flex flex-col px-1.5 m-0", theme === "dark" ? "bg-black" : "bg-white")}>

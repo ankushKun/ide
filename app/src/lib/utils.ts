@@ -431,7 +431,7 @@ export function createNewProject(
 }
 
 
-export async function fetchProjectFromProcess({ procesId, HB_URL = "https://scheduler.forward.computer" }: { procesId: string, HB_URL: string }) {
+export async function fetchProjectFromProcess({ procesId, HB_URL = "https://hb.arnode.asia" }: { procesId: string, HB_URL: string }) {
   const hashpath = `${HB_URL}/${procesId}/now/betteridea/~json@1.0/serialize`
   const res = await fetch(hashpath)
   const data = await res.json()
