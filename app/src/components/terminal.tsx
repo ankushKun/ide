@@ -106,7 +106,7 @@ export default function Terminal() {
     const settings = useSettings()
     const activeProjectId = useGlobalState(s => s.activeProject)
     const project = useProjects(s => s.projects[activeProjectId])
-    const process = project?.process
+    const process = useProjects(s => s.projects[activeProjectId]?.process)
 
     const terminalRef = useRef<HTMLDivElement>(null)
     const xtermRef = useRef<XTerm | null>(null)
@@ -127,6 +127,39 @@ export default function Terminal() {
             return basePrompt
         }
         return `${ANSI.DIM}${activeFile.name}>${ANSI.RESET}${basePrompt}`
+    }, [])
+
+    // Function to beautify error output
+    const beautifyErrorOutput = useCallback((errorText: string): string => {
+        if (!errorText || errorText.trim() === '') {
+            return ANSI.RESET + ANSI.RED + "✗ Execution Error" + ANSI.RESET + "\n" +
+                ANSI.RESET + ANSI.DIM + "  No error details available" + ANSI.RESET
+        }
+
+        // Split error into lines for better formatting
+        const lines = errorText.trim().split('\n')
+        let formattedError = ANSI.RESET + ANSI.RED + "✗ Lua Execution Error:" + ANSI.RESET + "\n"
+
+        lines.forEach((line, index) => {
+            if (line.trim()) {
+                // Indent each line and apply styling
+                if (line.includes('error:') || line.includes('Error:')) {
+                    // Main error line - make it stand out
+                    formattedError += ANSI.RESET + "  " + ANSI.RED + line.trim() + ANSI.RESET + "\n"
+                } else if (line.includes('stack traceback:') || line.includes('Stack traceback:')) {
+                    // Stack trace header
+                    formattedError += ANSI.RESET + "  " + ANSI.YELLOW + line.trim() + ANSI.RESET + "\n"
+                } else if (line.includes('stdin:') || line.match(/^\s*\[.*\]:/)) {
+                    // File/line references
+                    formattedError += ANSI.RESET + "    " + ANSI.CYAN + line.trim() + ANSI.RESET + "\n"
+                } else {
+                    // Other error details
+                    formattedError += ANSI.RESET + "  " + ANSI.DIM + line.trim() + ANSI.RESET + "\n"
+                }
+            }
+        })
+
+        return formattedError.trim()
     }, [])
 
     // Spinner state
@@ -573,6 +606,7 @@ export default function Terminal() {
                     clearTerminalToInitialState()
                     break;
                 case ".list":
+                case "ls":
                     // Add input to history
                     if (process) {
                         addTerminalEntry(process, {
@@ -593,7 +627,7 @@ export default function Terminal() {
                             filename.endsWith('.lua') || filename.endsWith('.luanb')
                         )
                         .map(([filename, file]: [string, any], index) => ({
-                            index: index.toString(),
+                            index: (index + 1).toString(),
                             name: filename,
                             process: file.process || 'default'
                         }))
@@ -699,9 +733,12 @@ export default function Terminal() {
                             filename.endsWith('.lua') || filename.endsWith('.luanb')
                         )
 
-                    if (index < 0 || index >= luaFiles.length) {
+                    // Convert 1-based index to 0-based for array access
+                    const arrayIndex = index - 1
+
+                    if (index < 1 || index > luaFiles.length) {
                         const errorMessage = "\n" + ANSI.RESET + ANSI.RED + "✗ Error: " + ANSI.RESET + "File index " + index + " is out of range\n" +
-                            ANSI.RESET + ANSI.DIM + "  Available indices: 0-" + (luaFiles.length - 1) + ANSI.RESET + "\n" +
+                            ANSI.RESET + ANSI.DIM + "  Available indices: 1-" + luaFiles.length + ANSI.RESET + "\n" +
                             ANSI.RESET + ANSI.DIM + "  Run " + ANSI.RESET + ANSI.CYAN + ".list" + ANSI.RESET + ANSI.DIM + " to see available files" + ANSI.RESET
 
                         if (process) {
@@ -714,12 +751,12 @@ export default function Terminal() {
 
                         readlineRef.current.println("")
                         readlineRef.current.println(ANSI.RESET + ANSI.RED + "✗ Error: " + ANSI.RESET + "File index " + index + " is out of range")
-                        readlineRef.current.println(ANSI.RESET + ANSI.DIM + "  Available indices: 0-" + (luaFiles.length - 1) + ANSI.RESET)
+                        readlineRef.current.println(ANSI.RESET + ANSI.DIM + "  Available indices: 1-" + luaFiles.length + ANSI.RESET)
                         readlineRef.current.println(ANSI.RESET + ANSI.DIM + "  Run " + ANSI.RESET + ANSI.CYAN + ".list" + ANSI.RESET + ANSI.DIM + " to see available files" + ANSI.RESET)
                         break
                     }
 
-                    const file = luaFiles[index]
+                    const file = luaFiles[arrayIndex]
 
                     // Set the active file in terminal state
                     if (process) {
@@ -766,7 +803,7 @@ export default function Terminal() {
                     startSpinner();
 
                     try {
-                        const result = await ao.runLua({ processId: process, code: text })
+                        const result = await ao.runLua({ processId: (activeFile?.process || process), code: text })
                         console.log(result)
 
                         // Stop spinner and clear only the spinner line
@@ -780,39 +817,40 @@ export default function Terminal() {
                         const finalPrompt = typeof newPrompt === 'string' && newPrompt.length > 0 ? newPrompt : prompt
                         setPrompt(finalPrompt)
 
+                        // Prepare output content with appropriate styling
+                        const displayContent = hasError ? beautifyErrorOutput(parsedOutput) : parsedOutput
+
                         // Update stored prompt and add to history with appropriate type
                         if (process) {
                             setTerminalPrompt(process, finalPrompt)
                             addTerminalEntry(process, {
                                 type: hasError ? 'error' : 'output',
-                                content: parsedOutput,
+                                content: displayContent,
                                 timestamp: Date.now()
                             })
                         }
 
                         // Print the output with appropriate styling
-                        if (hasError) {
-                            readlineRef.current.println(ANSI.RESET + ANSI.RED + parsedOutput + ANSI.RESET)
-                        } else {
-                            readlineRef.current.println(parsedOutput)
-                        }
+                        readlineRef.current.println(displayContent)
                     } catch (error) {
                         // Stop spinner and clear only the spinner line
                         stopSpinner()
 
-                        const errorMessage = `[Error: ${error.message || 'Unknown error'}]`
+                        const beautifiedCatchError = ANSI.RESET + ANSI.RED + "✗ Connection Error:" + ANSI.RESET + "\n" +
+                            ANSI.RESET + "  " + ANSI.RED + (error.message || 'Unknown error') + ANSI.RESET + "\n" +
+                            ANSI.RESET + ANSI.DIM + "  Check your connection and try again" + ANSI.RESET
 
                         // Add error to history
                         if (process) {
                             addTerminalEntry(process, {
                                 type: 'error',
-                                content: errorMessage,
+                                content: beautifiedCatchError,
                                 timestamp: Date.now()
                             })
                         }
 
                         // Print the error on a new line (command remains visible)
-                        readlineRef.current.println(ANSI.RESET + ANSI.RED + errorMessage + ANSI.RESET)
+                        readlineRef.current.println(beautifiedCatchError)
                     }
             }
 
@@ -821,7 +859,7 @@ export default function Terminal() {
 
         readLine()
 
-    }, [isReady, readlineRef, xtermRef, prompt, theme, process, addTerminalEntry, setTerminalPrompt, clearTerminalHistory, restoreTerminalHistory, clearTerminalToInitialState, ao, startSpinner, stopSpinner, getTerminalState, generatePromptWithFile])
+    }, [isReady, readlineRef, xtermRef, prompt, theme, process, addTerminalEntry, setTerminalPrompt, clearTerminalHistory, restoreTerminalHistory, clearTerminalToInitialState, ao, startSpinner, stopSpinner, getTerminalState, generatePromptWithFile, beautifyErrorOutput])
 
     return (
         <div className={cn("h-full w-full flex flex-col px-1.5 m-0", theme === "dark" ? "bg-black" : "bg-white")}>

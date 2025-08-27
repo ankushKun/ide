@@ -439,7 +439,7 @@ export default function Inbox() {
                         <div className="flex items-center gap-2">
                             <div className="flex items-center gap-2 relative">
                                 <InboxIcon className="h-5 w-5" />
-                                <Badge variant="secondary" className="text-xs font-bold absolute top-1/2 -translate-y-1/2 right-1/2 translate-x-1/2 border-none bg-background/60 !p-0 !h-3">
+                                <Badge variant="secondary" className="text-xs font-bold absolute top-1/2 -translate-y-1/2 right-1/2 translate-x-1/2 border-none bg-background/80 rounded-none !p-0 !px-0.5 !h-3">
                                     {inboxEntries.length}
                                 </Badge>
                             </div>

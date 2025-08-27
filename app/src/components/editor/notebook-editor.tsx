@@ -18,7 +18,7 @@ import {
 import { v4 as uuidv4 } from "uuid";
 import notebookTheme from "@/assets/themes/notebook.json";
 import { useSettings } from "@/hooks/use-settings";
-import { MainnetAO, TestnetAO } from "@/lib/ao";
+import { MainnetAO } from "@/lib/ao";
 import { useActiveAddress, useApi } from "@arweave-wallet-kit/react";
 import { parseOutput, isExecutionError, isErrorText } from "@/lib/utils";
 import { toast } from "sonner";
@@ -843,31 +843,6 @@ export default function NotebookEditor() {
                 console.log("Mainnet execution completed:", result);
 
             } else {
-                // Testnet execution - COMMENTED OUT
-                // const ao = new TestnetAO({
-                //     CU_URL: settings.actions.getCuUrl(),
-                //     GATEWAY_URL: settings.actions.getGatewayUrl(),
-                //     signer
-                // });
-
-                // updateCell(cellId, { output: "Running on testnet..." });
-
-                // // For testnet, we'll use the write method with eval action
-                // const tags = [
-                //     { name: "Action", value: "Eval", get: () => "Eval" }
-                // ] as any[];
-
-                // const result = await ao.write({
-                //     processId: project.process,
-                //     tags: tags,
-                //     data: code
-                // });
-
-                // updateCell(cellId, { 
-                //     output: `Code executed successfully!\n\nMessage ID: ${result}\n\nCheck the process for results.`
-                // });
-                // console.log("Testnet execution completed:", result);
-
                 updateCell(cellId, { output: "Testnet execution is currently disabled. Please use a mainnet project." });
                 toast.error("Testnet execution is not available");
             }

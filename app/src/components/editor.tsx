@@ -13,7 +13,7 @@ import { useTheme } from "@/components/theme-provider";
 import { getFileIconElement, parseOutput, stripAnsiCodes, isExecutionError, isErrorText } from "@/lib/utils";
 import { useSettings } from "@/hooks/use-settings";
 import { useTerminalState } from "@/hooks/use-terminal-state";
-import { MainnetAO, TestnetAO } from "@/lib/ao";
+import { MainnetAO } from "@/lib/ao";
 import { useActiveAddress, useApi } from "@arweave-wallet-kit/react";
 import { toast } from "sonner";
 import { OutputViewer } from "@/components/ui/output-viewer";
@@ -266,7 +266,8 @@ export default function Editor() {
             }
 
             // Check if project has a process ID
-            if (!project.process || !file.process) {
+            if (!project.process && !file.process) {
+                console.log(project, file)
                 const message = "Error: No process ID found for this project/file. Please set a process ID in project settings.";
                 actions.setOutput(message);
                 sendToTerminal(message);

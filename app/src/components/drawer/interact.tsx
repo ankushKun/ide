@@ -20,7 +20,7 @@ import {
     MessageSquare,
     X
 } from "lucide-react"
-import { MainnetAO, TestnetAO, type Tag } from "@/lib/ao"
+import { MainnetAO, type Tag } from "@/lib/ao"
 import type { InteractState } from "@/hooks/use-projects"
 import { parseOutput, shortenAddress } from "@/lib/utils"
 import Constants from "@/lib/constants"
@@ -197,7 +197,6 @@ const Interact = memo(function Interact() {
             messageTags.push(...tags)
             console.log(api)
 
-            // Use MainnetAO or TestnetAO based on project settings
             const ao = new MainnetAO({
                 HB_URL: settings.HB_URL,
                 GATEWAY_URL: settings.GATEWAY_URL,

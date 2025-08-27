@@ -25,57 +25,6 @@ interface MainnetOptions {
     signer?: any;
 }
 
-/// @deprecated
-export class TestnetAO {
-    private cuUrl: string;
-    private gatewayUrl: string;
-    private signer: any;
-
-    constructor(params: TestnetOptions) {
-        this.cuUrl = params.CU_URL;
-        this.gatewayUrl = params.GATEWAY_URL;
-        this.signer = params.signer;
-    }
-
-    ao() {
-        return connect({
-            MODE: "legacy",
-            CU_URL: this.cuUrl,
-            GATEWAY_URL: this.gatewayUrl,
-        })
-    }
-
-    async read({ processId, tags, data, Owner }: { processId: string, tags: Tag[], data: any, Owner: string }) {
-        const res = await this.ao().dryrun({
-            process: processId,
-            tags: tags,
-            data: data,
-            Owner: Owner
-        })
-        return res
-    }
-
-    async write({ processId, tags, data, noResult = false }: { processId: string, tags: Tag[], data: any, noResult?: boolean }) {
-        const mid = await this.ao().message({
-            process: processId,
-            tags: tags,
-            data: data,
-            signer: this.signer
-        })
-
-        if (noResult) {
-            return mid
-        }
-
-        const res1 = await this.ao().result({
-            process: processId,
-            message: mid,
-        })
-
-        return res1
-    }
-}
-
 export class MainnetAO {
     private hbUrl: string;
     private gatewayUrl: string;
@@ -162,6 +111,7 @@ export class MainnetAO {
             variant: 'ao.N.1',
             random: Math.random().toString(),
             authority: await this.operator() + ',fcoN_xJeisVsPXA-trzVAuIiqO3ydLQxM-L4XbrQKzY',
+            // 'signing-format': 'ans104',
             'signing-format': 'ANS-104',
             module: module_ || Constants.modules.mainnet.hyperAos,
             scheduler: await this.operator(),
@@ -203,6 +153,7 @@ export class MainnetAO {
 
         // compute slot and wait for initialization
         return new Promise((resolve) => {
+            // try {
             const slot = startLiveMonitoring(process, {
                 hbUrl: this.hbUrl,
                 gatewayUrl: this.gatewayUrl,
@@ -226,6 +177,12 @@ export class MainnetAO {
                     resolve(process)
                 }
             })
+            // }
+            // catch (e) {
+            //     console.error("Spawned but failed to initialize process:", e)
+            // } finally {
+            //     resolve(process)
+            // }
         })
     }
 
@@ -239,6 +196,7 @@ export class MainnetAO {
             variant: 'ao.N.1',
             target: processId,
             'signing-format': 'ANS-104',
+            // 'signing-format': 'ans104',
         }
 
         // Add tags as properties

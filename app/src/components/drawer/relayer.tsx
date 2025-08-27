@@ -22,7 +22,7 @@ import {
     EthernetPort,
     Waypoints
 } from "lucide-react"
-import { MainnetAO, TestnetAO, type Tag } from "@/lib/ao"
+import { MainnetAO, type Tag } from "@/lib/ao"
 import type { InteractState } from "@/hooks/use-projects"
 import { parseOutput, shortenAddress, isExecutionError } from "@/lib/utils"
 import Constants from "@/lib/constants"
