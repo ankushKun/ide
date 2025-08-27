@@ -292,8 +292,19 @@ export default function Settings() {
     const handleEditFileProcess = (fileName: string) => {
         setSelectedFileName(fileName)
         setFileProcessDialogOpen(true)
-        setFileProcessEditMode(null)
-        setEditFileProcessId("")
+
+        // Check if file already has a process
+        const file = activeProject?.files[fileName]
+        if (file?.process) {
+            // If file has a process, show paste mode by default with existing process ID
+            setFileProcessEditMode("paste")
+            setEditFileProcessId(file.process)
+        } else {
+            // If no process, show selection mode
+            setFileProcessEditMode(null)
+            setEditFileProcessId("")
+        }
+
         // Reset file-specific state
         setFileCustomTags([])
         setFileNewTagName("")
@@ -309,6 +320,10 @@ export default function Settings() {
 
     const handleSelectFileSpawnMode = () => {
         setFileProcessEditMode("spawn")
+    }
+
+    const handleResetFileProcess = () => {
+        setEditFileProcessId("")
     }
 
     const handleCancelEditFileProcess = () => {
@@ -365,22 +380,30 @@ export default function Settings() {
     const handleSaveFileProcess = () => {
         if (!activeProject || !selectedFileName) return
 
-        const validation = validateArweaveId(editFileProcessId, "Process ID")
-        if (!validation.isValid) {
-            toast.error(validation.error || "Invalid Process ID")
-            return
+        // Allow empty process ID to remove file's process assignment
+        if (editFileProcessId.trim()) {
+            const validation = validateArweaveId(editFileProcessId, "Process ID")
+            if (!validation.isValid) {
+                toast.error(validation.error || "Invalid Process ID")
+                return
+            }
         }
 
-        // Update the file with new process ID
+        // Update the file with new process ID (or remove it if empty)
         const updatedFile = {
             ...activeProject.files[selectedFileName],
-            process: editFileProcessId
+            process: editFileProcessId.trim() || undefined
         }
 
         projects.actions.setFile(activeProject.name, updatedFile)
         setFileProcessDialogOpen(false)
         setFileProcessEditMode(null)
-        toast.success(`Process ID updated for ${selectedFileName}`)
+
+        if (editFileProcessId.trim()) {
+            toast.success(`Process ID updated for ${selectedFileName}`)
+        } else {
+            toast.success(`Process ID removed for ${selectedFileName} (will use project default)`)
+        }
     }
 
     const handleSpawnNewFileProcess = async () => {
@@ -1046,14 +1069,41 @@ export default function Settings() {
                         <div className="space-y-4">
                             <div className="space-y-2">
                                 <Label htmlFor="file-process-id">Process ID</Label>
-                                <Input
-                                    id="file-process-id"
-                                    value={editFileProcessId}
-                                    onChange={(e) => setEditFileProcessId(e.target.value)}
-                                    placeholder="Enter process ID (leave empty to use project process)"
-                                    className="font-btr-code"
-                                />
+                                <div className="flex space-x-2">
+                                    <Input
+                                        id="file-process-id"
+                                        value={editFileProcessId}
+                                        onChange={(e) => setEditFileProcessId(e.target.value)}
+                                        placeholder="Enter process ID (leave empty to use project process)"
+                                        className="font-btr-code flex-1"
+                                    />
+                                    <Button
+                                        onClick={handleResetFileProcess}
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-9 px-3"
+                                        title="Reset and show options"
+                                    >
+                                        <RotateCcw className="h-3 w-3" />
+                                    </Button>
+                                </div>
                             </div>
+
+                            {/* Show spawn new process option below when in paste mode */}
+                            {activeProject?.isMainnet && activeAddress && (
+                                <div className="pt-2 border-t border-border/30">
+                                    <Button
+                                        onClick={handleSelectFileSpawnMode}
+                                        variant="outline"
+                                        className="w-full justify-start h-auto p-4"
+                                    >
+                                        <div className="text-left">
+                                            <div className="font-medium">Spawn New Process</div>
+                                            <div className="text-sm text-muted-foreground">Create a new process on the blockchain for this file</div>
+                                        </div>
+                                    </Button>
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -1184,7 +1234,7 @@ export default function Settings() {
 
                         {fileProcessEditMode === "paste" && (
                             <AlertDialogAction onClick={handleSaveFileProcess}>
-                                Save Process ID
+                                {editFileProcessId.trim() ? "Save Process ID" : "Remove Process ID"}
                             </AlertDialogAction>
                         )}
 
