@@ -40,14 +40,6 @@ const DrawerFiles = memo(function DrawerFiles() {
     const project = projects[activeProject]
     const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
 
-    // Note: No project handling is now done at the drawer level
-    // This component will only render when a project is active
-    if (!project) {
-        return null
-    }
-
-    const files = Object.entries(project.files)
-
     const handleRenameClick = useCallback((fileName: string) => {
         // Set the active file to the one being renamed, then trigger the dialog
         actions.setActiveFile(fileName)
@@ -65,6 +57,15 @@ const DrawerFiles = memo(function DrawerFiles() {
             trigger.click()
         }
     }, [actions])
+
+    // Note: No project handling is now done at the drawer level
+    // This component will only render when a project is active
+    // All hooks must be called before any conditional returns
+    if (!project) {
+        return null
+    }
+
+    const files = Object.entries(project.files)
 
     return (
         <div className="h-full flex flex-col">
@@ -120,13 +121,11 @@ const DrawerFiles = memo(function DrawerFiles() {
                         {files.map(([fileName, file]) => {
                             const { icon: FileIcon, className: iconClassName } = getFileIcon(fileName, 16)
                             const isActive = activeFile === fileName
-                            const contextMenuTriggerRef = useRef<HTMLDivElement>(null)
 
                             return (
                                 <ContextMenu key={fileName}>
                                     <ContextMenuTrigger asChild>
                                         <div
-                                            ref={contextMenuTriggerRef}
                                             className={cn(
                                                 "group flex items-center gap-2 px-3 py-1.5 text-sm cursor-pointer transition-colors",
                                                 "hover:bg-accent/80",
@@ -156,15 +155,16 @@ const DrawerFiles = memo(function DrawerFiles() {
                                                     className="h-5 w-5 p-0 hover:bg-muted"
                                                     onClick={(e) => {
                                                         e.stopPropagation()
-                                                        // Trigger context menu by dispatching a right-click event on the ref
-                                                        if (contextMenuTriggerRef.current) {
+                                                        // Trigger context menu by dispatching a right-click event on the parent element
+                                                        const parentElement = e.currentTarget.closest('[data-radix-context-menu-trigger]')
+                                                        if (parentElement) {
                                                             const rightClickEvent = new MouseEvent('contextmenu', {
                                                                 bubbles: true,
                                                                 cancelable: true,
                                                                 clientX: e.clientX,
                                                                 clientY: e.clientY,
                                                             })
-                                                            contextMenuTriggerRef.current.dispatchEvent(rightClickEvent)
+                                                            parentElement.dispatchEvent(rightClickEvent)
                                                         }
                                                     }}
                                                 >
