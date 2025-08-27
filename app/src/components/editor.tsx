@@ -266,11 +266,11 @@ export default function Editor() {
             }
 
             // Check if project has a process ID
-            if (!project.process) {
-                const message = "Error: No process ID found for this project. Please set a process ID in project settings.";
+            if (!project.process || !file.process) {
+                const message = "Error: No process ID found for this project/file. Please set a process ID in project settings.";
                 actions.setOutput(message);
                 sendToTerminal(message);
-                toast.error("No process ID configured for this project");
+                toast.error("No process ID configured for this project/file");
                 return;
             }
 
@@ -298,7 +298,7 @@ export default function Editor() {
 
                 // Execute the Lua code
                 const result = await ao.runLua({
-                    processId: project.process,
+                    processId: file.process || project.process,
                     code: code
                 });
                 console.log("result", result)

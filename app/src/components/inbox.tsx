@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RefreshCw, Mail, AlertCircle, Clock, User, ChevronRight, MessageSquare, Shield, ShieldCheck, Send, Server, Inbox as InboxIcon, FileText, Hash, Calendar, Eye, EyeOff } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, shortenAddress } from "@/lib/utils";
 import { MainnetAO, type Tag } from "@/lib/ao";
 import { useSettings } from "@/hooks/use-settings";
 import React from "react";
@@ -43,16 +44,74 @@ interface InboxItem {
 
 type Inbox = Record<string, InboxItem>;
 
+interface ProcessOption {
+    processId: string;
+    fileName: string;
+    projectName: string;
+}
+
+// Helper function to get all unique processes from Lua/Luanb files
+const getAllProcesses = (projects: Record<string, any>): ProcessOption[] => {
+    const processes: ProcessOption[] = [];
+    const seenProcesses = new Set<string>();
+
+    Object.entries(projects).forEach(([projectName, project]) => {
+        // Add project-level process if it exists
+        if (project.process && !seenProcesses.has(project.process)) {
+            seenProcesses.add(project.process);
+            processes.push({
+                processId: project.process,
+                fileName: "default",
+                projectName
+            });
+        }
+
+        // Add file-level processes for Lua/Luanb files
+        Object.entries(project.files || {}).forEach(([fileName, file]: [string, any]) => {
+            if ((fileName.endsWith('.lua') || fileName.endsWith('.luanb')) &&
+                file.process &&
+                !seenProcesses.has(file.process)) {
+                seenProcesses.add(file.process);
+                processes.push({
+                    processId: file.process,
+                    fileName,
+                    projectName
+                });
+            }
+        });
+    });
+
+    return processes;
+};
+
 export default function Inbox() {
     const { HB_URL, GATEWAY_URL } = useSettings();
     const { activeProject: activeProjectId } = useGlobalState();
     const activeProject = useProjects(p => p.projects[activeProjectId]);
-    const processId = activeProject?.process;
+    const allProjects = useProjects(p => p.projects);
 
     const [inbox, setInbox] = useState<Inbox | null>({});
     const [selectedMessage, setSelectedMessage] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const [selectedProcessId, setSelectedProcessId] = useState<string>("");
+
+    // Get all available processes
+    const availableProcesses = getAllProcesses(allProjects);
+
+    // Set default selected process when component mounts or active project changes
+    useEffect(() => {
+        if (availableProcesses.length > 0 && !selectedProcessId) {
+            // Try to use the active project's process first
+            const activeProjectProcess = activeProject?.process;
+            if (activeProjectProcess && availableProcesses.some(p => p.processId === activeProjectProcess)) {
+                setSelectedProcessId(activeProjectProcess);
+            } else {
+                // Otherwise use the first available process
+                setSelectedProcessId(availableProcesses[0].processId);
+            }
+        }
+    }, [availableProcesses, activeProject?.process, selectedProcessId]);
 
     const ao = new MainnetAO({
         HB_URL,
@@ -60,11 +119,11 @@ export default function Inbox() {
     });
 
     const loadInbox = async () => {
-        if (!processId) return;
+        if (!selectedProcessId) return;
 
         setIsLoading(true);
         try {
-            const hashpath = `/${processId}/now/Inbox`;
+            const hashpath = `/${selectedProcessId}/now/Inbox`;
             const res = await ao.read<Inbox>({ path: hashpath }).then(ao.sanitizeResponse);
             setInbox(res);
 
@@ -86,8 +145,10 @@ export default function Inbox() {
     };
 
     useEffect(() => {
+        // Reset selected message when changing processes
+        setSelectedMessage(null);
         loadInbox();
-    }, [processId]);
+    }, [selectedProcessId]);
 
     const formatTimestamp = (timestamp: string | number) => {
         try {
@@ -352,15 +413,15 @@ export default function Inbox() {
     const inboxEntries = inbox ? Object.entries(inbox) : [];
     const selectedMessageData = selectedMessage && inbox ? inbox[selectedMessage] : null;
 
-    if (!processId) {
+    if (availableProcesses.length === 0) {
         return (
             <div className="flex items-center justify-center h-full">
                 <div className="text-center space-y-3">
                     <InboxIcon className="h-12 w-12 text-muted-foreground mx-auto" />
                     <div className="space-y-1">
-                        <h3 className="font-medium">No Process Selected</h3>
+                        <h3 className="font-medium">No Processes Found</h3>
                         <p className="text-sm text-muted-foreground">
-                            Select a project with an active process to view its inbox
+                            No Lua or Luanb files with processes found in your projects
                         </p>
                     </div>
                 </div>
@@ -373,15 +434,31 @@ export default function Inbox() {
             {/* Message List */}
             <div className="w-1/3 border-r border-border flex flex-col">
                 {/* Header */}
-                <div className="p-2 px-4 border-b border-border">
+                <div className="p-2 px-4 border-b border-border space-y-3">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                            <InboxIcon className="h-5 w-5" />
+                            <div className="flex items-center gap-2 relative">
+                                <InboxIcon className="h-5 w-5" />
+                                <Badge variant="secondary" className="text-xs font-bold absolute top-1/2 -translate-y-1/2 right-1/2 translate-x-1/2 border-none bg-background/60 !p-0 !h-3">
+                                    {inboxEntries.length}
+                                </Badge>
+                            </div>
                             <h1 className="font-semibold">Inbox</h1>
-                            <Badge variant="secondary" className="text-xs">
-                                {inboxEntries.length}
-                            </Badge>
                         </div>
+                        <Select value={selectedProcessId} onValueChange={setSelectedProcessId}>
+                            <SelectTrigger className="h-8 text-xs w-full !bg-background border-none !border-b">
+                                <SelectValue placeholder="Select process..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {availableProcesses.map((process) => (
+                                    <SelectItem key={process.processId} value={process.processId}>
+                                        <div className="flex flex-col items-start">
+                                            <span className="font-medium truncate !max-w-150px]">{process.fileName} {shortenAddress(process.processId)}</span>
+                                        </div>
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                         <Button
                             variant="ghost"
                             size="sm"

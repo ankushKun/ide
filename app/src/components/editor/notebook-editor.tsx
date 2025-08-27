@@ -813,7 +813,7 @@ export default function NotebookEditor() {
 
                 // Execute the Lua code
                 const result = await ao.runLua({
-                    processId: project.process,
+                    processId: file.process || project.process,
                     code: code
                 });
 

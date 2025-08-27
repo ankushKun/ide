@@ -196,7 +196,7 @@ const Relayer = memo(function Relayer() {
 
             // Execute the generated Lua code
             const result = await ao.runLua({
-                processId: activeProject.process,
+                processId: activeProject.files[globalState.activeFile]?.process || activeProject.process,
                 code: luaCode
             })
 
