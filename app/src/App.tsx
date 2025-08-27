@@ -93,7 +93,7 @@ export default function App() {
   }, [drawerOpen])
 
   return (
-    <div className="flex flex-col h-screen overflow-clip">
+    <div className="flex flex-col h-screen max-h-screen overflow-clip">
       <Menubar />
       <div className="flex grow">
         <LeftSidebar />

@@ -1,6 +1,6 @@
 import { useActiveAddress, useConnection, useProfileModal } from "@arweave-wallet-kit/react";
 import { Button } from "./ui/button";
-import { Database, Wallet, Wallet2, Copy, Unplug, Plug, PartyPopper } from "lucide-react";
+import { Database, Wallet, Wallet2, Copy, Unplug, Plug, PartyPopper, Microchip, FileBox, Box } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
 import { cn, stripAnsiCodes } from "@/lib/utils";
@@ -30,7 +30,10 @@ export default function Statusbar() {
 
     // Get active project and process ID
     const activeProject = globalState.activeProject ? projects.projects[globalState.activeProject] : null;
-    const activeProcessId = activeProject?.process;
+    const fileProcessId = activeProject?.files[globalState.activeFile]?.process;
+    const projectProcessId = activeProject?.process;
+    const activeProcessId = fileProcessId || projectProcessId;
+    const isFileProcess = fileProcessId && fileProcessId !== projectProcessId;
 
     // Shorten address or process ID
     const shortenId = (id: string) => {
@@ -41,10 +44,10 @@ export default function Statusbar() {
 
     // Copy process ID to clipboard
     const copyProcessId = async () => {
-        if (!activeProcessId) return;
+        if (!projectProcessId) return;
 
         try {
-            await navigator.clipboard.writeText(activeProcessId);
+            await navigator.clipboard.writeText(projectProcessId);
             toast.success("Process ID copied to clipboard");
         } catch (error) {
             toast.error("Failed to copy process ID");
@@ -76,7 +79,7 @@ export default function Statusbar() {
 
     // Function to send output to terminal with response waiting and queue fallback
     const sendToTerminal = (output: string) => {
-        if (!activeProcessId) return;
+        if (!projectProcessId) return;
 
         const terminalEntry = {
             type: 'output' as const,
@@ -92,7 +95,7 @@ export default function Statusbar() {
         const responseTimeout = setTimeout(() => {
             if (!responseReceived) {
                 // Terminal didn't respond, add to queue
-                addToQueue(activeProcessId, terminalEntry);
+                addToQueue(projectProcessId, terminalEntry);
                 console.log('Terminal not responding, added to queue:', output.slice(0, 50));
             }
             // Clean up listener
@@ -126,16 +129,16 @@ export default function Statusbar() {
         }
 
         // Start monitoring if we have an active mainnet process
-        if (activeProcessId && activeProject?.isMainnet) {
+        if (projectProcessId && activeProject?.isMainnet) {
             const hbUrl = settings.actions.getHbUrl();
             const gatewayUrl = settings.actions.getGatewayUrl();
 
-            stopMonitoringRef.current = startLiveMonitoring(activeProcessId, {
+            stopMonitoringRef.current = startLiveMonitoring(projectProcessId, {
                 hbUrl,
                 gatewayUrl,
                 intervalMs: 2000,
-                hasShownSlot: (slot: number) => hasShownSlot(activeProcessId, slot),
-                markSlotAsShown: (slot: number) => addShownSlot(activeProcessId, slot),
+                hasShownSlot: (slot: number) => hasShownSlot(projectProcessId, slot),
+                markSlotAsShown: (slot: number) => addShownSlot(projectProcessId, slot),
                 onResult: (result) => {
                     // Only send to terminal if there's new data with print output
                     if (result.hasNewData && result.hasPrint) {
@@ -156,11 +159,11 @@ export default function Statusbar() {
                 stopMonitoringRef.current = null;
             }
         };
-    }, [activeProcessId, activeProject?.isMainnet, settings, hasShownSlot, addShownSlot])
+    }, [projectProcessId, activeProject?.isMainnet, settings, hasShownSlot, addShownSlot])
 
     useEffect(() => {
         function syncProjectToProcess() {
-            if (!activeProcessId) return;
+            if (!projectProcessId) return;
             const project = projects.projects[globalState.activeProject];
             if (!project) return;
 
@@ -175,19 +178,19 @@ export default function Statusbar() {
 
             // set a variable in the process containing the entire projects json
             console.log("SYNC")
-            ao.runLua({ processId: activeProcessId, code: `betteridea = [[${JSON.stringify(project)}]]` })
+            ao.runLua({ processId: projectProcessId, code: `betteridea = [[${JSON.stringify(project)}]]` })
         }
 
         const interval = setInterval(syncProjectToProcess, 15000);
         return () => clearInterval(interval);
-    }, [activeProcessId, projects, globalState.activeProject, settings])
+    }, [projectProcessId, projects, globalState.activeProject, settings])
 
     if (!mounted) {
         return null;
     }
 
     return (
-        <div className="border-t h-[20px] text-xs flex items-center overflow-clip px-1 pr-3 bg-background/50 backdrop-blur-sm">
+        <div className="border-t h-[22px] mb-[1px] text-xs flex items-center overflow-clip px-1 pr-3 bg-background/50 backdrop-blur-sm">
             {/* Left Section - Connection Status */}
             <Button
                 className={cn("h-full !px-2 gap-1.5 text-xs font-medium rounded-none", connected && "bg-background text-foreground hover:text-background")}
@@ -203,31 +206,36 @@ export default function Statusbar() {
 
             {/* Right Section - Performance and Version */}
             <div className="grow"></div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-0 font-btr-code">
                 {/* Active Process ID */}
                 {activeProcessId && (
                     <Button
                         variant="ghost"
-                        className="h-full px-2 text-xs rounded-none text-muted-foreground hover:text-foreground transition-colors"
+                        className="h-full px-2 text-xs rounded-none text-foreground hover:text-foreground transition-colors gap-1"
                         onClick={copyProcessId}
                         title={`Process ID: ${activeProcessId} (click to copy)`}
                     >
+                        {
+                            isFileProcess ? (<FileBox className="!h-3 !w-3" />) : (<Box className="!h-3 !w-3" />)
+                        }
                         <span className="font-btr-code text-xs">{shortenId(activeProcessId)}</span>
                     </Button>
                 )}
 
-                {/* Memory Usage */}
-                <div className="flex items-center gap-1 text-muted-foreground">
-                    <Database className="w-3 h-3" />
-                    <span className="text-xs font-medium">{performance.memory}MB</span>
-                </div>
 
                 {/* Version Information */}
-                <div className="flex items-center gap-1 text-muted-foreground">
+                <div className="flex items-center gap-0 text-muted-foreground">
+                    {/* Memory Usage */}
+                    <div className="flex items-center gap-0 text-muted-foreground">
+                        <Microchip className="h-3" />
+                        <span className="text-xs font-medium">{performance.memory}MB</span>
+                    </div>
+                    |
                     <span className="text-xs font-medium">
                         {/* @ts-ignore */}
                         v{version}
                     </span>
+                    |
                     <Link
                         to={`https://github.com/betteridea-dev/ide/commit/${
                             /* @ts-ignore */

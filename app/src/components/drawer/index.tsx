@@ -32,7 +32,7 @@ export default function Drawer() {
     }, [])
 
 
-    return <div className={cn("w-full h-full bg-background overflow-hidden", drawerOpen && "block")}>
+    return <div className={cn("w-full h-full max-h-[calc(100vh-50px)] bg-background overflow-clip", drawerOpen && "block")}>
         {!activeProject || !project ? <div className={cn("w-full h-full bg-background overflow-hidden", drawerOpen && "block")}>
             <div className="h-full flex flex-col">
                 {/* No project state */}
@@ -74,7 +74,7 @@ export default function Drawer() {
                     </div>
                 </div>
             </div>
-        </div> : <>
+        </div> : <div className="h-full max-h-[calc(100vh-50px)] overflow-clip">
             <div className={activeTab === "files" ? "block" : "hidden"}>
                 <Files />
             </div>
@@ -96,7 +96,7 @@ export default function Drawer() {
             {!["files", "packages", "sqlite", "interact", "relayer", "ao-companion"].includes(activeTab) && (
                 <div className="p-4 text-center text-muted-foreground">Select a tab</div>
             )}
-        </>}
+        </div>}
 
     </div>
 }
