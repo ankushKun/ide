@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { ArrowLeft, Moon, Sun, Save, RotateCcw, Settings as SettingsIcon, Edit3, Check, X, Plus, Tag as TagIcon } from "lucide-react"
+import { ArrowLeft, Moon, Sun, Save, RotateCcw, Settings as SettingsIcon, Edit3, Check, X, Plus, Tag as TagIcon, ChevronDown, ChevronRight, FileText } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -47,7 +47,24 @@ export default function Settings() {
     const [newTagValue, setNewTagValue] = useState("")
     const [tagErrors, setTagErrors] = useState<string[]>([])
 
+    // Files section state
+    const [isFilesSectionExpanded, setIsFilesSectionExpanded] = useState(false)
+    const [fileProcessDialogOpen, setFileProcessDialogOpen] = useState(false)
+    const [fileProcessEditMode, setFileProcessEditMode] = useState<"paste" | "spawn" | null>(null)
+    const [selectedFileName, setSelectedFileName] = useState("")
+    const [editFileProcessId, setEditFileProcessId] = useState("")
+    const [isSpawningFileProcess, setIsSpawningFileProcess] = useState(false)
+    const [fileCustomTags, setFileCustomTags] = useState<{ name: string; value: string }[]>([])
+    const [fileNewTagName, setFileNewTagName] = useState("")
+    const [fileNewTagValue, setFileNewTagValue] = useState("")
+    const [fileTagErrors, setFileTagErrors] = useState<string[]>([])
+
     const activeProject = globalState.activeProject ? projects.projects[globalState.activeProject] : null
+
+    // Get filtered files (.lua and .luanb only)
+    const filteredFiles = activeProject ? Object.values(activeProject.files).filter(file =>
+        file.name.endsWith('.lua') || file.name.endsWith('.luanb')
+    ) : []
 
     const handleVimModeChange = (enabled: boolean) => {
         settings.actions.setVimMode(enabled)
@@ -268,6 +285,160 @@ export default function Settings() {
             toast.error(`Failed to spawn process: ${error instanceof Error ? error.message : 'Unknown error'}`)
         } finally {
             setIsSpawningProcess(false)
+        }
+    }
+
+    // File process management handlers
+    const handleEditFileProcess = (fileName: string) => {
+        setSelectedFileName(fileName)
+        setFileProcessDialogOpen(true)
+        setFileProcessEditMode(null)
+        setEditFileProcessId("")
+        // Reset file-specific state
+        setFileCustomTags([])
+        setFileNewTagName("")
+        setFileNewTagValue("")
+        setFileTagErrors([])
+    }
+
+    const handleSelectFilePasteMode = () => {
+        setFileProcessEditMode("paste")
+        const file = activeProject?.files[selectedFileName]
+        setEditFileProcessId(file?.process || "")
+    }
+
+    const handleSelectFileSpawnMode = () => {
+        setFileProcessEditMode("spawn")
+    }
+
+    const handleCancelEditFileProcess = () => {
+        setFileProcessDialogOpen(false)
+        setFileProcessEditMode(null)
+        setSelectedFileName("")
+        setEditFileProcessId("")
+        // Reset file-specific state
+        setFileCustomTags([])
+        setFileNewTagName("")
+        setFileNewTagValue("")
+        setFileTagErrors([])
+    }
+
+    const addFileTag = () => {
+        if (!fileNewTagName.trim() || !fileNewTagValue.trim()) return
+
+        const tagName = fileNewTagName.trim()
+        const tagValue = fileNewTagValue.trim()
+
+        // Clear previous errors
+        setFileTagErrors([])
+
+        // Check for reserved tag names
+        const reservedTags = ["Name", "Module", "Scheduler", "SDK"]
+        if (reservedTags.some(reserved => reserved.toLowerCase() === tagName.toLowerCase())) {
+            setFileTagErrors([`"${tagName}" is a reserved tag name`])
+            return
+        }
+
+        // Check if tag name already exists
+        const existingTag = fileCustomTags.find(tag => tag.name.toLowerCase() === tagName.toLowerCase())
+        if (existingTag) {
+            setFileTagErrors(["A tag with this name already exists"])
+            return
+        }
+
+        // Validate tag name format (alphanumeric, hyphens, underscores)
+        if (!/^[a-zA-Z0-9\-_]+$/.test(tagName)) {
+            setFileTagErrors(["Tag name can only contain letters, numbers, hyphens, and underscores"])
+            return
+        }
+
+        setFileCustomTags([...fileCustomTags, { name: tagName, value: tagValue }])
+        setFileNewTagName("")
+        setFileNewTagValue("")
+    }
+
+    const removeFileTag = (index: number) => {
+        setFileCustomTags(fileCustomTags.filter((_, i) => i !== index))
+        setFileTagErrors([]) // Clear errors when removing tags
+    }
+
+    const handleSaveFileProcess = () => {
+        if (!activeProject || !selectedFileName) return
+
+        const validation = validateArweaveId(editFileProcessId, "Process ID")
+        if (!validation.isValid) {
+            toast.error(validation.error || "Invalid Process ID")
+            return
+        }
+
+        // Update the file with new process ID
+        const updatedFile = {
+            ...activeProject.files[selectedFileName],
+            process: editFileProcessId
+        }
+
+        projects.actions.setFile(activeProject.name, updatedFile)
+        setFileProcessDialogOpen(false)
+        setFileProcessEditMode(null)
+        toast.success(`Process ID updated for ${selectedFileName}`)
+    }
+
+    const handleSpawnNewFileProcess = async () => {
+        if (!activeProject || !activeAddress || !selectedFileName) {
+            toast.error("Wallet connection required to spawn new process")
+            return
+        }
+
+        if (!activeProject.isMainnet) {
+            toast.error("Process spawning is only available for mainnet projects")
+            return
+        }
+
+        setIsSpawningFileProcess(true)
+
+        try {
+            const signer = createSigner(api)
+            const ao = new MainnetAO({
+                GATEWAY_URL: settings.actions.getGatewayUrl(),
+                HB_URL: settings.actions.getHbUrl(),
+                signer
+            })
+
+            const tags = [
+                { name: "Name", value: `${activeProject.name}-${selectedFileName}` },
+                ...fileCustomTags
+            ]
+
+            const processId = await ao.spawn({
+                tags,
+                module_: Constants.modules.mainnet.hyperAos
+            })
+
+            // Update the file with new process ID
+            const updatedFile = {
+                ...activeProject.files[selectedFileName],
+                process: processId
+            }
+
+            projects.actions.setFile(activeProject.name, updatedFile)
+            toast.success(`New process spawned for ${selectedFileName}`)
+
+            // Close dialog after successful spawn
+            setTimeout(() => {
+                setFileProcessDialogOpen(false)
+                setFileProcessEditMode(null)
+                // Reset file-specific state
+                setFileCustomTags([])
+                setFileNewTagName("")
+                setFileNewTagValue("")
+                setFileTagErrors([])
+            }, 1500) // Delay to show success message
+
+        } catch (error) {
+            console.error("Failed to spawn file process:", error)
+            toast.error(`Failed to spawn process: ${error instanceof Error ? error.message : 'Unknown error'}`)
+        } finally {
+            setIsSpawningFileProcess(false)
         }
     }
 
@@ -557,11 +728,57 @@ export default function Settings() {
                                                     </p>
                                                 </div>
                                             </div>
-                                            <div className="flex items-center justify-between py-2">
-                                                <Label className="text-sm font-medium">Files</Label>
-                                                <p className="text-sm font-medium text-foreground/80">
-                                                    {Object.keys(activeProject.files).length} files
-                                                </p>
+                                            <div className="space-y-2 -mx-3">
+                                                <Button
+                                                    variant="ghost"
+                                                    onClick={() => setIsFilesSectionExpanded(!isFilesSectionExpanded)}
+                                                    className="w-full justify-between py-2 px-0 h-auto hover:bg-transparent"
+                                                >
+                                                    <Label className="text-sm font-medium cursor-pointer">Files ({filteredFiles.length})</Label>
+                                                    {isFilesSectionExpanded ? (
+                                                        <ChevronDown className="h-4 w-4" />
+                                                    ) : (
+                                                        <ChevronRight className="h-4 w-4" />
+                                                    )}
+                                                </Button>
+
+                                                {isFilesSectionExpanded && (
+                                                    <div className="space-y-2 pl-4 border-l border-border/30">
+                                                        {filteredFiles.length > 0 ? (
+                                                            filteredFiles.map((file) => (
+                                                                <div key={file.name} className="flex items-center justify-between py-2 border-b border-border/30 last:border-b-0">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <FileText className="h-3 w-3 text-muted-foreground" />
+                                                                        <Label className="text-sm font-medium">{file.name}</Label>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <Button
+                                                                            onClick={() => handleEditFileProcess(file.name)}
+                                                                            variant="ghost"
+                                                                            size="sm"
+                                                                            className="h-8 w-8 p-0"
+                                                                        >
+                                                                            <Edit3 className="h-3 w-3" />
+                                                                        </Button>
+                                                                        <p className="text-sm font-btr-code text-foreground/80 truncate max-w-[200px]">
+                                                                            {file.process ? (
+                                                                                file.process
+                                                                            ) : (
+                                                                                <span className="text-muted-foreground italic">
+                                                                                    default
+                                                                                </span>
+                                                                            )}
+                                                                        </p>
+                                                                    </div>
+                                                                </div>
+                                                            ))
+                                                        ) : (
+                                                            <p className="text-xs text-muted-foreground pl-5">
+                                                                No .lua or .luanb files found
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     </CardContent>
@@ -777,6 +994,206 @@ export default function Settings() {
                                 disabled={isSpawningProcess || !activeProject?.isMainnet || !activeAddress}
                             >
                                 {isSpawningProcess ? "Spawning..." : "Spawn Process"}
+                            </Button>
+                        )}
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            {/* File Process Edit Dialog */}
+            <AlertDialog open={fileProcessDialogOpen} onOpenChange={(open) => {
+                // Prevent closing dialog while spawning process
+                if (!open && isSpawningFileProcess) return
+                setFileProcessDialogOpen(open)
+            }}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Edit Process for {selectedFileName}</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Choose how you want to update the process for this file. If no process is set, the file will use the project's default process.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+
+                    {fileProcessEditMode === null && (
+                        <div className="space-y-4">
+                            <Button
+                                onClick={handleSelectFilePasteMode}
+                                variant="outline"
+                                className="w-full justify-start h-auto p-4"
+                            >
+                                <div className="text-left">
+                                    <div className="font-medium">Paste Existing Process ID</div>
+                                    <div className="text-sm text-muted-foreground">Enter an existing process ID to use for this file</div>
+                                </div>
+                            </Button>
+
+                            {activeProject?.isMainnet && activeAddress && (
+                                <Button
+                                    onClick={handleSelectFileSpawnMode}
+                                    variant="outline"
+                                    className="w-full justify-start h-auto p-4"
+                                >
+                                    <div className="text-left">
+                                        <div className="font-medium">Spawn New Process</div>
+                                        <div className="text-sm text-muted-foreground">Create a new process on the blockchain for this file</div>
+                                    </div>
+                                </Button>
+                            )}
+                        </div>
+                    )}
+
+                    {fileProcessEditMode === "paste" && (
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="file-process-id">Process ID</Label>
+                                <Input
+                                    id="file-process-id"
+                                    value={editFileProcessId}
+                                    onChange={(e) => setEditFileProcessId(e.target.value)}
+                                    placeholder="Enter process ID (leave empty to use project process)"
+                                    className="font-btr-code"
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {fileProcessEditMode === "spawn" && (
+                        <div className="space-y-4">
+                            <div className="p-4 bg-muted/50 rounded-md">
+                                <p className="text-sm">
+                                    This will create a new process on the blockchain using the HyperAOS module for {selectedFileName}.
+                                    {!activeProject?.isMainnet && (
+                                        <span className="text-red-500"> Process spawning is only available for mainnet projects.</span>
+                                    )}
+                                    {!activeAddress && (
+                                        <span className="text-red-500"> Please connect your wallet to spawn a new process.</span>
+                                    )}
+                                </p>
+                                {isSpawningFileProcess && (
+                                    <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-md">
+                                        <p className="text-sm text-blue-800 dark:text-blue-200">
+                                            🔄 Spawning process on the blockchain... This may take a few moments.
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Custom Tags Section */}
+                            {!isSpawningFileProcess && (
+                                <div className="space-y-3">
+                                    <div className="flex items-center gap-2">
+                                        <TagIcon className="w-4 h-4" />
+                                        <Label className="text-sm font-medium">Custom Tags</Label>
+                                    </div>
+
+                                    {/* Display existing tags */}
+                                    {fileCustomTags.length > 0 && (
+                                        <div className="flex flex-wrap gap-2">
+                                            {fileCustomTags.map((tag, index) => (
+                                                <div key={index} className="group relative inline-flex items-center">
+                                                    <div className="flex items-center border border-border rounded-md overflow-hidden bg-background group-hover:pr-3 transition-all duration-150">
+                                                        <div className="px-2 py-1 text-xs font-medium bg-primary/50 border-r border-border">
+                                                            {tag.name}
+                                                        </div>
+                                                        <div className="px-2 py-1 text-xs font-btr-code">
+                                                            {tag.value}
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        className="absolute right-0.5 top-1/2 -translate-y-1/2 p-0.5 mr-0.5 rounded-sm hover:bg-muted/60 dark:hover:bg-muted/40 transition-all duration-150 opacity-0 group-hover:opacity-100"
+                                                        onClick={() => removeFileTag(index)}
+                                                        aria-label={`Remove ${tag.name} tag`}
+                                                    >
+                                                        <X size={12} className="text-muted-foreground/70 hover:text-foreground/90" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {/* Add new tag form */}
+                                    <div className="space-y-2">
+                                        <div className="flex gap-2">
+                                            <Input
+                                                placeholder="Tag name"
+                                                value={fileNewTagName}
+                                                onChange={(e) => setFileNewTagName(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter' && fileNewTagName.trim() && fileNewTagValue.trim()) {
+                                                        e.preventDefault()
+                                                        addFileTag()
+                                                    }
+                                                }}
+                                                className="flex-1"
+                                            />
+                                            <Input
+                                                placeholder="Tag value"
+                                                value={fileNewTagValue}
+                                                onChange={(e) => setFileNewTagValue(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter' && fileNewTagName.trim() && fileNewTagValue.trim()) {
+                                                        e.preventDefault()
+                                                        addFileTag()
+                                                    }
+                                                }}
+                                                className="flex-1 font-btr-code"
+                                            />
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={addFileTag}
+                                                disabled={!fileNewTagName.trim() || !fileNewTagValue.trim()}
+                                                className="px-3"
+                                            >
+                                                <Plus className="h-3 w-3" />
+                                            </Button>
+                                        </div>
+                                        {fileTagErrors.length > 0 && (
+                                            <div className="space-y-1">
+                                                {fileTagErrors.map((error, index) => (
+                                                    <p key={index} className="text-sm text-red-500">{error}</p>
+                                                ))}
+                                            </div>
+                                        )}
+                                        <p className="text-xs text-muted-foreground">Press Enter to add tag</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {isSpawningFileProcess && (
+                                <div className="text-xs text-muted-foreground">
+                                    <p>• Creating new process with HyperAOS module</p>
+                                    <p>• Updating {selectedFileName} with new process ID</p>
+                                    <p>• Process will be owned by: {activeAddress?.slice(0, 8)}...{activeAddress?.slice(-8)}</p>
+                                    {fileCustomTags.length > 0 && (
+                                        <p>• Adding {fileCustomTags.length} custom tag{fileCustomTags.length > 1 ? 's' : ''}</p>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    <AlertDialogFooter>
+                        <AlertDialogCancel
+                            onClick={handleCancelEditFileProcess}
+                            disabled={isSpawningFileProcess}
+                        >
+                            Cancel
+                        </AlertDialogCancel>
+
+                        {fileProcessEditMode === "paste" && (
+                            <AlertDialogAction onClick={handleSaveFileProcess}>
+                                Save Process ID
+                            </AlertDialogAction>
+                        )}
+
+                        {fileProcessEditMode === "spawn" && (
+                            <Button
+                                onClick={handleSpawnNewFileProcess}
+                                disabled={isSpawningFileProcess || !activeProject?.isMainnet || !activeAddress}
+                            >
+                                {isSpawningFileProcess ? "Spawning..." : "Spawn Process"}
                             </Button>
                         )}
                     </AlertDialogFooter>
