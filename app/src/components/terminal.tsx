@@ -121,6 +121,14 @@ export default function Terminal() {
     const { addTerminalEntry, setTerminalPrompt, clearTerminalHistory, getTerminalState, processQueue, setActiveFile: setTerminalActiveFile } = useTerminalState(s => s.actions)
     const terminalState = process ? getTerminalState(process) : { history: [], prompt: "aos> " }
 
+    // Function to generate prompt with active file prefix
+    const generatePromptWithFile = useCallback((basePrompt: string, activeFile: File | null): string => {
+        if (!activeFile || !activeFile.name) {
+            return basePrompt
+        }
+        return `${ANSI.DIM}${activeFile.name}>${ANSI.RESET}${basePrompt}`
+    }, [])
+
     // Spinner state
     const spinnerIntervalRef = useRef<NodeJS.Timeout | null>(null)
     // const spinnerChars = ['▖', '▘', '▝', '▗']
@@ -177,9 +185,21 @@ export default function Terminal() {
                 xtermRef.current!.write('\r\n') // Add proper carriage return + line feed
             }
         })
-        xtermRef.current.write("\n" + ANSI.RESET + ANSI.DIM + "Connected to process: " + ANSI.RESET + ANSI.LIGHTBLUE + process + ANSI.RESET)
+
+        // Determine which process to display and build connection message
+        const terminalState = getTerminalState(process)
+        const displayProcess = terminalState.activeFile?.process || process
+
+        let connectionMessage = "\n" + ANSI.RESET + ANSI.DIM + "Connected to process: " + ANSI.RESET + ANSI.LIGHTBLUE + displayProcess + ANSI.RESET
+
+        // Add filename if active file is available
+        if (terminalState.activeFile?.name) {
+            connectionMessage += ANSI.RESET + ANSI.DIM + " (" + ANSI.RESET + ANSI.WHITE + terminalState.activeFile.name + ANSI.RESET + ANSI.DIM + ")" + ANSI.RESET
+        }
+
+        xtermRef.current.write(connectionMessage)
         xtermRef.current.write('\n\r\n')
-    }, [process])
+    }, [process, getTerminalState])
 
     // Helper function to write multi-line content with proper formatting
     const writeMultiLineContent = useCallback((content: string, prefix: string = '', suffix: string = '') => {
@@ -210,7 +230,8 @@ export default function Terminal() {
         state.history.forEach(entry => {
             switch (entry.type) {
                 case 'input':
-                    xtermRef.current!.write(ANSI.RESET + state.prompt + entry.content + '\r\n')
+                    const inputPrompt = generatePromptWithFile(state.prompt, state.activeFile)
+                    xtermRef.current!.write(ANSI.RESET + inputPrompt + entry.content + '\r\n')
                     break
                 case 'output':
                     writeMultiLineContent(entry.content, ANSI.RESET)
@@ -229,7 +250,8 @@ export default function Terminal() {
         queuedEntries.forEach(entry => {
             switch (entry.type) {
                 case 'input':
-                    xtermRef.current!.write(ANSI.RESET + state.prompt + entry.content + '\r\n')
+                    const queueInputPrompt = generatePromptWithFile(state.prompt, state.activeFile)
+                    xtermRef.current!.write(ANSI.RESET + queueInputPrompt + entry.content + '\r\n')
                     break
                 case 'output':
                     writeMultiLineContent(entry.content, ANSI.RESET)
@@ -247,8 +269,9 @@ export default function Terminal() {
         setPrompt(state.prompt)
 
         // Always show the current prompt in the terminal so user knows where to type
-        xtermRef.current!.write(ANSI.RESET + state.prompt)
-    }, [process, getTerminalState, showInitialTerminalState, processQueue, writeMultiLineContent])
+        const displayPrompt = generatePromptWithFile(state.prompt, state.activeFile)
+        xtermRef.current!.write(ANSI.RESET + displayPrompt)
+    }, [process, getTerminalState, showInitialTerminalState, processQueue, writeMultiLineContent, generatePromptWithFile])
 
     // Function to clear terminal to initial state
     const clearTerminalToInitialState = useCallback(() => {
@@ -267,8 +290,10 @@ export default function Terminal() {
         showInitialTerminalState()
 
         // Show the current prompt in the terminal so user knows where to type
-        xtermRef.current.write(ANSI.RESET + currentPrompt)
-    }, [process, prompt, clearTerminalHistory, setTerminalPrompt, showInitialTerminalState])
+        const terminalState = getTerminalState(process)
+        const displayPrompt = generatePromptWithFile(currentPrompt, terminalState.activeFile)
+        xtermRef.current.write(ANSI.RESET + displayPrompt)
+    }, [process, prompt, clearTerminalHistory, setTerminalPrompt, showInitialTerminalState, getTerminalState, generatePromptWithFile])
 
 
     useEffect(() => {
@@ -414,8 +439,10 @@ export default function Terminal() {
                 readlineRef.current.println(ANSI.RESET + output.trim() + ANSI.RESET)
 
                 // Ensure the prompt is shown after the output
-                const safePrompt = typeof prompt === 'string' && prompt.length > 0 ? prompt : "aos> "
-                xtermRef.current.write(safePrompt)
+                const basePrompt = typeof prompt === 'string' && prompt.length > 0 ? prompt : "aos> "
+                const terminalState = getTerminalState(process)
+                const displayPrompt = generatePromptWithFile(basePrompt, terminalState.activeFile)
+                xtermRef.current.write(displayPrompt)
 
                 // Send response back to the triggering component if eventId is provided
                 if (eventId) {
@@ -523,8 +550,10 @@ export default function Terminal() {
                 readlineRef.current.println(ANSI.RESET + ANSI.RED + "[Go into Settings > Project and set or create a new process]" + ANSI.RESET);
                 return
             }
-            const safePrompt = typeof prompt === 'string' && prompt.length > 0 ? prompt : "aos> "
-            readlineRef.current.read(safePrompt).then(processLine);
+            const basePrompt = typeof prompt === 'string' && prompt.length > 0 ? prompt : "aos> "
+            const terminalState = getTerminalState(process)
+            const displayPrompt = generatePromptWithFile(basePrompt, terminalState.activeFile)
+            readlineRef.current.read(displayPrompt).then(processLine);
         }
 
         function clearLines(count: number) {
@@ -718,6 +747,11 @@ export default function Terminal() {
 
 
                     break;
+                case ".reset":
+                    setTerminalActiveFile(process, null)
+                    setActiveFile(null)
+                    readlineRef.current.println(ANSI.RESET + ANSI.GREEN + "✓ Reset terminal active file" + ANSI.RESET)
+                    break;
                 default:
                     // Add input to history
                     if (process) {
@@ -787,7 +821,7 @@ export default function Terminal() {
 
         readLine()
 
-    }, [isReady, readlineRef, xtermRef, prompt, theme, process, addTerminalEntry, setTerminalPrompt, clearTerminalHistory, restoreTerminalHistory, clearTerminalToInitialState, ao, startSpinner, stopSpinner])
+    }, [isReady, readlineRef, xtermRef, prompt, theme, process, addTerminalEntry, setTerminalPrompt, clearTerminalHistory, restoreTerminalHistory, clearTerminalToInitialState, ao, startSpinner, stopSpinner, getTerminalState, generatePromptWithFile])
 
     return (
         <div className={cn("h-full w-full flex flex-col px-1.5 m-0", theme === "dark" ? "bg-black" : "bg-white")}>
