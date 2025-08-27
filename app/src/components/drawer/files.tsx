@@ -18,7 +18,7 @@ import {
     Plus
 } from "lucide-react"
 import { cn, getFileIcon } from "@/lib/utils"
-import { useState, memo, useCallback } from "react"
+import { useState, memo, useCallback, useRef } from "react"
 import {
     ContextMenu,
     ContextMenuContent,
@@ -120,11 +120,13 @@ const DrawerFiles = memo(function DrawerFiles() {
                         {files.map(([fileName, file]) => {
                             const { icon: FileIcon, className: iconClassName } = getFileIcon(fileName, 16)
                             const isActive = activeFile === fileName
+                            const contextMenuTriggerRef = useRef<HTMLDivElement>(null)
 
                             return (
                                 <ContextMenu key={fileName}>
                                     <ContextMenuTrigger asChild>
                                         <div
+                                            ref={contextMenuTriggerRef}
                                             className={cn(
                                                 "group flex items-center gap-2 px-3 py-1.5 text-sm cursor-pointer transition-colors",
                                                 "hover:bg-accent/80",
@@ -154,7 +156,16 @@ const DrawerFiles = memo(function DrawerFiles() {
                                                     className="h-5 w-5 p-0 hover:bg-muted"
                                                     onClick={(e) => {
                                                         e.stopPropagation()
-                                                        // Handle file menu
+                                                        // Trigger context menu by dispatching a right-click event on the ref
+                                                        if (contextMenuTriggerRef.current) {
+                                                            const rightClickEvent = new MouseEvent('contextmenu', {
+                                                                bubbles: true,
+                                                                cancelable: true,
+                                                                clientX: e.clientX,
+                                                                clientY: e.clientY,
+                                                            })
+                                                            contextMenuTriggerRef.current.dispatchEvent(rightClickEvent)
+                                                        }
                                                     }}
                                                 >
                                                     <MoreHorizontal className="w-3 h-3" />
