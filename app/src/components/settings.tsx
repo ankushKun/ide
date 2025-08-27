@@ -54,24 +54,32 @@ export default function Settings() {
         toast.success(`VIM mode ${enabled ? "enabled" : "disabled"}`)
     }
 
-    const handleUrlSave = (type: "cu" | "hb" | "gateway", url: string) => {
-        if (!settings.actions.isValidUrl(url)) {
-            toast.error("Invalid URL format")
-            return
+    const handleSaveAllUrls = () => {
+        // Validate all URLs first
+        const urls = [
+            { type: "CU", url: customCuUrl },
+            { type: "Hyperbeam", url: customHbUrl },
+            { type: "Gateway", url: customGatewayUrl }
+        ]
+
+        for (const { type, url } of urls) {
+            if (!settings.actions.isValidUrl(url)) {
+                toast.error(`Invalid ${type} URL format`)
+                return
+            }
         }
 
-        switch (type) {
-            case "cu":
-                settings.actions.setCU_URL(url)
-                break
-            case "hb":
-                settings.actions.setHB_URL(url)
-                break
-            case "gateway":
-                settings.actions.setGATEWAY_URL(url)
-                break
-        }
-        toast.success(`${type.toUpperCase()} URL saved`)
+        // Save all URLs if validation passes
+        settings.actions.setCU_URL(customCuUrl)
+        settings.actions.setHB_URL(customHbUrl)
+        settings.actions.setGATEWAY_URL(customGatewayUrl)
+
+        toast.success("Network settings saved successfully")
+
+        // Refresh the app to apply new network settings
+        setTimeout(() => {
+            window.location.reload()
+        }, 1000) // Small delay to show the success message
     }
 
     const handleUrlReset = (type: "cu" | "hb" | "gateway") => {
@@ -90,6 +98,18 @@ export default function Settings() {
                 break
         }
         toast.success(`${type.toUpperCase()} URL reset to default`)
+    }
+
+    const handleResetAllUrls = () => {
+        settings.actions.resetCuUrl()
+        settings.actions.resetHbUrl()
+        settings.actions.resetGatewayUrl()
+
+        setCustomCuUrl(settings.actions.getCuUrl())
+        setCustomHbUrl(settings.actions.getHbUrl())
+        setCustomGatewayUrl(settings.actions.getGatewayUrl())
+
+        toast.success("All network settings reset to defaults")
     }
 
     const handleGeminiKeySave = () => {
@@ -387,12 +407,23 @@ export default function Settings() {
 
                         <TabsContent value="network" className="space-y-4 mt-6">
                             <Card className="border-border/40 bg-card/50">
-                                <CardHeader className="pb-3">
-                                    <CardTitle className="text-base font-medium">AO Network Configuration</CardTitle>
-                                    <CardDescription className="text-xs text-muted-foreground">
-                                        Configure custom URLs for AO services
-                                    </CardDescription>
-                                </CardHeader>
+                                <div className="flex justify-between items-center">
+                                    <CardHeader className="pb-3 grow">
+                                        <CardTitle className="text-base font-medium">AO Network Configuration</CardTitle>
+                                        <CardDescription className="text-xs text-muted-foreground">
+                                            Configure custom URLs for AO services
+                                        </CardDescription>
+                                    </CardHeader>
+                                    <Button
+                                        onClick={handleSaveAllUrls}
+                                        size="sm"
+                                        className="flex items-center gap-2 w-fit mr-8"
+                                    >
+                                        <Save className="h-3 w-3" />
+                                        Save Network Settings
+                                    </Button>
+                                </div>
+
                                 <CardContent className="space-y-5">
                                     <div className="space-y-2">
                                         <Label htmlFor="cu-url" className="text-sm font-medium">CU URL</Label>
@@ -404,13 +435,6 @@ export default function Settings() {
                                                 onChange={(e) => setCustomCuUrl(e.target.value)}
                                                 className="bg-background/50 border-border/60 text-sm font-btr-code"
                                             />
-                                            <Button
-                                                onClick={() => handleUrlSave("cu", customCuUrl)}
-                                                size="sm"
-                                                className="h-9 px-3"
-                                            >
-                                                <Save className="h-3 w-3" />
-                                            </Button>
                                             <Button
                                                 onClick={() => handleUrlReset("cu")}
                                                 variant="ghost"
@@ -433,13 +457,6 @@ export default function Settings() {
                                                 className="bg-background/50 border-border/60 text-sm font-btr-code"
                                             />
                                             <Button
-                                                onClick={() => handleUrlSave("hb", customHbUrl)}
-                                                size="sm"
-                                                className="h-9 px-3"
-                                            >
-                                                <Save className="h-3 w-3" />
-                                            </Button>
-                                            <Button
                                                 onClick={() => handleUrlReset("hb")}
                                                 variant="ghost"
                                                 size="sm"
@@ -461,13 +478,6 @@ export default function Settings() {
                                                 className="bg-background/50 border-border/60 text-sm font-btr-code"
                                             />
                                             <Button
-                                                onClick={() => handleUrlSave("gateway", customGatewayUrl)}
-                                                size="sm"
-                                                className="h-9 px-3"
-                                            >
-                                                <Save className="h-3 w-3" />
-                                            </Button>
-                                            <Button
                                                 onClick={() => handleUrlReset("gateway")}
                                                 variant="ghost"
                                                 size="sm"
@@ -478,8 +488,28 @@ export default function Settings() {
                                         </div>
                                     </div>
 
+                                    {/* <div className="flex gap-2 pt-2 justify-end">
+                                        <Button
+                                            onClick={handleSaveAllUrls}
+                                            size="sm"
+                                            className="flex items-center gap-2"
+                                        >
+                                            <Save className="h-3 w-3" />
+                                            Save Network Settings
+                                        </Button>
+                                        <Button
+                                            onClick={handleResetAllUrls}
+                                            variant="ghost"
+                                            size="sm"
+                                            className="flex items-center gap-2"
+                                        >
+                                            <RotateCcw className="h-3 w-3" />
+                                            Reset All to Defaults
+                                        </Button>
+                                    </div> */}
+
                                     <div className="text-xs text-muted-foreground bg-muted/50 border border-border/40 p-3 rounded-md">
-                                        <strong>Note:</strong> When using custom URLs, it is recommended to use the same providers for CU, Hyperbeam & Gateway for optimal performance.
+                                        <strong>Note:</strong> When using custom URLs, it is recommended to use the same providers for CU, Hyperbeam & Gateway for optimal performance. The app will refresh after saving to apply the new settings.
                                     </div>
                                 </CardContent>
                             </Card>
