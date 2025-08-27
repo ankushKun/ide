@@ -38,6 +38,8 @@ export function startLiveMonitoring(
 
     let lastSlot: number | undefined = options.lastKnownSlot
     let isRunning = true
+    let consecutiveErrors = 0
+    const maxConsecutiveErrors = 3
 
     const ao = new MainnetAO({
         HB_URL: hbUrl,
@@ -120,8 +122,20 @@ export function startLiveMonitoring(
                 }
             }
 
+            // Reset consecutive errors on successful execution
+            consecutiveErrors = 0
+
         } catch (error) {
-            console.error('Error in live monitoring:', error)
+            consecutiveErrors++
+            console.error(`Error in live monitoring (${consecutiveErrors}/${maxConsecutiveErrors}):`, error)
+
+            // Stop monitoring if we've hit the maximum consecutive errors
+            if (consecutiveErrors >= maxConsecutiveErrors) {
+                console.warn(`Live monitoring stopped for process ${processId}: ${maxConsecutiveErrors} consecutive errors encountered`)
+                console.error('Maximum consecutive errors reached. Stopping live monitoring.')
+                isRunning = false
+                return
+            }
         }
 
         // Schedule next check

@@ -1,5 +1,6 @@
 import { create } from "zustand"
 import { persist, createJSONStorage } from "zustand/middleware"
+import type { File } from "./use-projects"
 
 export interface TerminalHistoryEntry {
     type: 'input' | 'output' | 'error' | 'system'
@@ -11,7 +12,8 @@ export interface ProcessTerminalState {
     history: TerminalHistoryEntry[]
     prompt: string
     shownSlots: Set<number>
-    queue: TerminalHistoryEntry[]
+    queue: TerminalHistoryEntry[],
+    activeFile: File | null
 }
 
 interface TerminalStateActions {
@@ -25,10 +27,11 @@ interface TerminalStateActions {
     addToQueue: (processId: string, entry: TerminalHistoryEntry) => void
     processQueue: (processId: string) => TerminalHistoryEntry[]
     clearQueue: (processId: string) => void
+    setActiveFile: (processId: string, file: File | null) => void
 }
 
 export interface TerminalState {
-    terminalStates: { [processId: string]: ProcessTerminalState }
+    terminalStates: { [processId: string]: ProcessTerminalState },
     actions: TerminalStateActions
 }
 
@@ -71,14 +74,15 @@ export const useTerminalState = create<TerminalState>()(persist((set, get) => ({
                     history: [],
                     prompt: state.terminalStates[processId]?.prompt || "aos> ",
                     shownSlots: new Set(), // Clear shown slots when clearing history
-                    queue: state.terminalStates[processId]?.queue || []
+                    queue: state.terminalStates[processId]?.queue || [],
+                    activeFile: state.terminalStates[processId]?.activeFile || null
                 }
             }
         })),
 
         getTerminalState: (processId: string) => {
             const state = get()
-            return state.terminalStates[processId] || { history: [], prompt: "aos> ", shownSlots: new Set(), queue: [] }
+            return state.terminalStates[processId] || { history: [], prompt: "aos> ", shownSlots: new Set(), queue: [], activeFile: null }
         },
 
         addShownSlot: (processId: string, slot: number) => set((state) => {
@@ -92,7 +96,8 @@ export const useTerminalState = create<TerminalState>()(persist((set, get) => ({
                     [processId]: {
                         ...currentState,
                         shownSlots: newShownSlots,
-                        queue: currentState.queue || []
+                        queue: currentState.queue || [],
+                        activeFile: state.terminalStates[processId]?.activeFile || null
                     }
                 }
             }
@@ -112,19 +117,21 @@ export const useTerminalState = create<TerminalState>()(persist((set, get) => ({
                     history: state.terminalStates[processId]?.history || [],
                     prompt: state.terminalStates[processId]?.prompt || "aos> ",
                     shownSlots: new Set(),
-                    queue: state.terminalStates[processId]?.queue || []
+                    queue: state.terminalStates[processId]?.queue || [],
+                    activeFile: state.terminalStates[processId]?.activeFile || null
                 }
             }
         })),
 
         addToQueue: (processId: string, entry: TerminalHistoryEntry) => set((state) => {
-            const currentState = state.terminalStates[processId] || { history: [], prompt: "aos> ", shownSlots: new Set(), queue: [] }
+            const currentState = state.terminalStates[processId] || { history: [], prompt: "aos> ", shownSlots: new Set(), queue: [], activeFile: null }
             return {
                 terminalStates: {
                     ...state.terminalStates,
                     [processId]: {
                         ...currentState,
-                        queue: [...currentState.queue, entry]
+                        queue: [...currentState.queue, entry],
+                        activeFile: currentState.activeFile || null
                     }
                 }
             }
@@ -146,7 +153,8 @@ export const useTerminalState = create<TerminalState>()(persist((set, get) => ({
                                 ...(state.terminalStates[processId]?.history || []),
                                 ...queuedEntries
                             ],
-                            queue: []
+                            queue: [],
+                            activeFile: state.terminalStates[processId]?.activeFile || null
                         }
                     }
                 }))
@@ -163,7 +171,22 @@ export const useTerminalState = create<TerminalState>()(persist((set, get) => ({
                     history: state.terminalStates[processId]?.history || [],
                     prompt: state.terminalStates[processId]?.prompt || "aos> ",
                     shownSlots: state.terminalStates[processId]?.shownSlots || new Set(),
-                    queue: []
+                    queue: [],
+                    activeFile: state.terminalStates[processId]?.activeFile || null
+                }
+            }
+        })),
+
+        setActiveFile: (processId: string, file: File | null) => set((state) => ({
+            terminalStates: {
+                ...state.terminalStates,
+                [processId]: {
+                    ...state.terminalStates[processId],
+                    history: state.terminalStates[processId]?.history || [],
+                    prompt: state.terminalStates[processId]?.prompt || "aos> ",
+                    shownSlots: state.terminalStates[processId]?.shownSlots || new Set(),
+                    queue: state.terminalStates[processId]?.queue || [],
+                    activeFile: file
                 }
             }
         }))
@@ -178,7 +201,8 @@ export const useTerminalState = create<TerminalState>()(persist((set, get) => ({
                 {
                     ...terminalState,
                     shownSlots: Array.from(terminalState.shownSlots || new Set()),
-                    queue: terminalState.queue || []
+                    queue: terminalState.queue || [],
+                    activeFile: terminalState.activeFile || null
                 }
             ])
         )
@@ -191,9 +215,11 @@ export const useTerminalState = create<TerminalState>()(persist((set, get) => ({
                 if (terminalState && Array.isArray(terminalState.shownSlots)) {
                     terminalState.shownSlots = new Set(terminalState.shownSlots)
                     terminalState.queue = terminalState.queue || []
+                    terminalState.activeFile = terminalState.activeFile || null
                 } else if (!terminalState.shownSlots) {
                     terminalState.shownSlots = new Set()
                     terminalState.queue = terminalState.queue || []
+                    terminalState.activeFile = terminalState.activeFile || null
                 }
             })
         }

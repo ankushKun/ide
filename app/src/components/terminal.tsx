@@ -3,7 +3,7 @@ import { Terminal as XTerm } from '@xterm/xterm'
 import { useTheme } from './theme-provider'
 import { ANSI, cn, isExecutionError, parseOutput } from '@/lib/utils'
 import { useSettings } from '@/hooks/use-settings'
-import { useProjects } from '@/hooks/use-projects'
+import { useProjects, type File } from '@/hooks/use-projects'
 import { useGlobalState } from '@/hooks/use-global-state'
 import { useTerminalState, type TerminalHistoryEntry } from '@/hooks/use-terminal-state'
 import { FitAddon } from '@xterm/addon-fit'
@@ -13,6 +13,80 @@ import '@xterm/xterm/css/xterm.css'
 import { MainnetAO } from '@/lib/ao'
 import { createSigner } from '@permaweb/aoconnect'
 import { useApi } from '@arweave-wallet-kit/react'
+
+// Utility function for pretty printing tables
+interface TableColumn {
+    header: string
+    key: string
+    align?: 'left' | 'right' | 'center'
+    maxWidth?: number
+}
+
+interface TableRow {
+    [key: string]: string | number
+}
+
+function createPrettyTable(data: TableRow[], columns: TableColumn[], highlightRowIndex?: number): string[] {
+    if (!data.length) return ['No data to display']
+
+    // Calculate column widths
+    const columnWidths = columns.map(col => {
+        const headerWidth = col.header.length
+        const maxDataWidth = Math.max(
+            ...data.map(row => String(row[col.key] || '').length)
+        )
+        const width = Math.max(headerWidth, maxDataWidth)
+        return col.maxWidth ? Math.min(width, col.maxWidth) : width
+    })
+
+    // Helper function to pad text based on alignment
+    const padText = (text: string, width: number, align: 'left' | 'right' | 'center' = 'left'): string => {
+        const truncated = text.length > width ? text.substring(0, width - 3) + '...' : text
+        const padding = width - truncated.length
+
+        switch (align) {
+            case 'right':
+                return ' '.repeat(padding) + truncated
+            case 'center':
+                const leftPad = Math.floor(padding / 2)
+                const rightPad = padding - leftPad
+                return ' '.repeat(leftPad) + truncated + ' '.repeat(rightPad)
+            default:
+                return truncated + ' '.repeat(padding)
+        }
+    }
+
+    const lines: string[] = []
+
+    // Create header row
+    const headerRow = columns.map((col, i) =>
+        padText(col.header, columnWidths[i], col.align)
+    ).join(' │ ')
+    lines.push('┌─' + columnWidths.map(w => '─'.repeat(w)).join('─┬─') + '─┐')
+    lines.push('│ ' + headerRow + ' │')
+
+    // Create separator
+    lines.push('├─' + columnWidths.map(w => '─'.repeat(w)).join('─┼─') + '─┤')
+
+    // Create data rows
+    data.forEach((row, rowIndex) => {
+        const dataRow = columns.map((col, i) =>
+            padText(String(row[col.key] || ''), columnWidths[i], col.align)
+        ).join(' │ ')
+
+        // Highlight the row if it matches the highlightRowIndex
+        if (highlightRowIndex !== undefined && rowIndex === highlightRowIndex) {
+            lines.push('│ ' + ANSI.LIGHTGREEN + dataRow + ANSI.RESET + ' │')
+        } else {
+            lines.push('│ ' + dataRow + ' │')
+        }
+    })
+
+    // Create bottom border
+    lines.push('└─' + columnWidths.map(w => '─'.repeat(w)).join('─┴─') + '─┘')
+
+    return lines
+}
 
 const AOS_ASCII = String.raw`
       ___           ___           ___     
@@ -33,6 +107,7 @@ export default function Terminal() {
     const activeProjectId = useGlobalState(s => s.activeProject)
     const project = useProjects(s => s.projects[activeProjectId])
     const process = project?.process
+
     const terminalRef = useRef<HTMLDivElement>(null)
     const xtermRef = useRef<XTerm | null>(null)
     const fitAddonRef = useRef<FitAddon | null>(null)
@@ -40,9 +115,10 @@ export default function Terminal() {
     const resizeObserverRef = useRef<ResizeObserver | null>(null)
     const [isReady, setIsReady] = useState(false)
     const [prompt, setPrompt] = useState("aos> ")
+    const [activeFile, setActiveFile] = useState<File | null>(null)
 
     // Terminal state management
-    const { addTerminalEntry, setTerminalPrompt, clearTerminalHistory, getTerminalState, processQueue } = useTerminalState(s => s.actions)
+    const { addTerminalEntry, setTerminalPrompt, clearTerminalHistory, getTerminalState, processQueue, setActiveFile: setTerminalActiveFile } = useTerminalState(s => s.actions)
     const terminalState = process ? getTerminalState(process) : { history: [], prompt: "aos> " }
 
     // Spinner state
@@ -463,9 +539,184 @@ export default function Terminal() {
                 return setTimeout(readLine, 100);
             }
 
-            switch (text) {
+            switch (text.split(" ")[0]) {
                 case "clear":
                     clearTerminalToInitialState()
+                    break;
+                case ".list":
+                    // Add input to history
+                    if (process) {
+                        addTerminalEntry(process, {
+                            type: 'input',
+                            content: text,
+                            timestamp: Date.now()
+                        })
+                    }
+                    // list project files and their processes in a table format (lua and luanb only)
+                    const files = project?.files
+                    if (!files || Object.keys(files).length === 0) {
+                        readlineRef.current.println(ANSI.RESET + ANSI.YELLOW + "No files found in project" + ANSI.RESET)
+                        break
+                    }
+
+                    const tableData = Object.entries(files)
+                        .filter(([filename, file]: [string, any]) =>
+                            filename.endsWith('.lua') || filename.endsWith('.luanb')
+                        )
+                        .map(([filename, file]: [string, any], index) => ({
+                            index: index.toString(),
+                            name: filename,
+                            process: file.process || 'default'
+                        }))
+
+                    if (tableData.length === 0) {
+                        readlineRef.current.println(ANSI.RESET + ANSI.YELLOW + "No Lua files found in project" + ANSI.RESET)
+                        break
+                    }
+
+                    // Find the index of the active file to highlight it (from terminal state)
+                    const terminalState = getTerminalState(process)
+                    const activeFileName = terminalState.activeFile?.name
+                    const activeFileIndex = activeFileName ? tableData.findIndex(row => row.name === activeFileName) : -1
+
+                    const columns: TableColumn[] = [
+                        { header: '#', key: 'index', align: 'right', maxWidth: 3 },
+                        { header: 'File Name', key: 'name', align: 'left', maxWidth: 20 },
+                        { header: 'Process ID', key: 'process', align: 'left', maxWidth: 45 }
+                    ]
+
+                    const tableLines = createPrettyTable(tableData, columns, activeFileIndex >= 0 ? activeFileIndex : undefined)
+
+                    // Apply green color to table lines for both display and history storage
+                    const coloredTableLines = tableLines.map(line => ANSI.RESET + ANSI.GREEN + line + ANSI.RESET)
+
+                    // Add instructional message
+                    const instructionalMessage = "\n" + ANSI.RESET + ANSI.DIM + "Use " + ANSI.RESET + ANSI.CYAN + ".select <#>" + ANSI.RESET + ANSI.DIM + " to set the active file for this terminal" + ANSI.RESET
+
+                    // Add terminal entry for the table output with colors preserved
+                    if (process) {
+                        addTerminalEntry(process, {
+                            type: 'output',
+                            content: coloredTableLines.join('\n') + instructionalMessage,
+                            timestamp: Date.now()
+                        })
+                    }
+
+                    // Print each line of the table
+                    coloredTableLines.forEach(line => {
+                        readlineRef.current.println(line)
+                    })
+
+                    // Add instructional message
+                    readlineRef.current.println("")
+                    readlineRef.current.println(ANSI.RESET + ANSI.DIM + "Use " + ANSI.RESET + ANSI.CYAN + ".select <#>" + ANSI.RESET + ANSI.DIM + " to set the active file for this terminal" + ANSI.RESET)
+                    break;
+                case ".select":
+                    // Add input to history
+                    if (process) {
+                        addTerminalEntry(process, {
+                            type: 'input',
+                            content: text,
+                            timestamp: Date.now()
+                        })
+                    }
+
+                    const indexStr = text.split(" ")[1]
+
+                    // Validate input
+                    if (!indexStr) {
+                        const errorMessage = "\n" + ANSI.RESET + ANSI.RED + "✗ Error: " + ANSI.RESET + "Please specify a file index\n" +
+                            ANSI.RESET + ANSI.DIM + "  Usage: " + ANSI.RESET + ANSI.CYAN + ".select <#>" + ANSI.RESET + "\n" +
+                            ANSI.RESET + ANSI.DIM + "  Run " + ANSI.RESET + ANSI.CYAN + ".list" + ANSI.RESET + ANSI.DIM + " to see available files" + ANSI.RESET
+
+                        if (process) {
+                            addTerminalEntry(process, {
+                                type: 'error',
+                                content: errorMessage,
+                                timestamp: Date.now()
+                            })
+                        }
+
+                        readlineRef.current.println("")
+                        readlineRef.current.println(ANSI.RESET + ANSI.RED + "✗ Error: " + ANSI.RESET + "Please specify a file index")
+                        readlineRef.current.println(ANSI.RESET + ANSI.DIM + "  Usage: " + ANSI.RESET + ANSI.CYAN + ".select <#>" + ANSI.RESET)
+                        readlineRef.current.println(ANSI.RESET + ANSI.DIM + "  Run " + ANSI.RESET + ANSI.CYAN + ".list" + ANSI.RESET + ANSI.DIM + " to see available files" + ANSI.RESET)
+                        break
+                    }
+
+                    const index = parseInt(indexStr)
+
+                    if (isNaN(index)) {
+                        const errorMessage = "\n" + ANSI.RESET + ANSI.RED + "✗ Error: " + ANSI.RESET + "Invalid file index '" + indexStr + "'\n" +
+                            ANSI.RESET + ANSI.DIM + "  Please use a numeric index from the " + ANSI.RESET + ANSI.CYAN + ".list" + ANSI.RESET + ANSI.DIM + " command" + ANSI.RESET
+
+                        if (process) {
+                            addTerminalEntry(process, {
+                                type: 'error',
+                                content: errorMessage,
+                                timestamp: Date.now()
+                            })
+                        }
+
+                        readlineRef.current.println("")
+                        readlineRef.current.println(ANSI.RESET + ANSI.RED + "✗ Error: " + ANSI.RESET + "Invalid file index '" + indexStr + "'")
+                        readlineRef.current.println(ANSI.RESET + ANSI.DIM + "  Please use a numeric index from the " + ANSI.RESET + ANSI.CYAN + ".list" + ANSI.RESET + ANSI.DIM + " command" + ANSI.RESET)
+                        break
+                    }
+
+                    // Filter to only Lua files (same as .list command)
+                    const luaFiles = Object.entries(project?.files || {})
+                        .filter(([filename, file]: [string, any]) =>
+                            filename.endsWith('.lua') || filename.endsWith('.luanb')
+                        )
+
+                    if (index < 0 || index >= luaFiles.length) {
+                        const errorMessage = "\n" + ANSI.RESET + ANSI.RED + "✗ Error: " + ANSI.RESET + "File index " + index + " is out of range\n" +
+                            ANSI.RESET + ANSI.DIM + "  Available indices: 0-" + (luaFiles.length - 1) + ANSI.RESET + "\n" +
+                            ANSI.RESET + ANSI.DIM + "  Run " + ANSI.RESET + ANSI.CYAN + ".list" + ANSI.RESET + ANSI.DIM + " to see available files" + ANSI.RESET
+
+                        if (process) {
+                            addTerminalEntry(process, {
+                                type: 'error',
+                                content: errorMessage,
+                                timestamp: Date.now()
+                            })
+                        }
+
+                        readlineRef.current.println("")
+                        readlineRef.current.println(ANSI.RESET + ANSI.RED + "✗ Error: " + ANSI.RESET + "File index " + index + " is out of range")
+                        readlineRef.current.println(ANSI.RESET + ANSI.DIM + "  Available indices: 0-" + (luaFiles.length - 1) + ANSI.RESET)
+                        readlineRef.current.println(ANSI.RESET + ANSI.DIM + "  Run " + ANSI.RESET + ANSI.CYAN + ".list" + ANSI.RESET + ANSI.DIM + " to see available files" + ANSI.RESET)
+                        break
+                    }
+
+                    const file = luaFiles[index]
+
+                    // Set the active file in terminal state
+                    if (process) {
+                        setTerminalActiveFile(process, file[1])
+                    }
+                    setActiveFile(file[1])
+
+                    // Beautiful success message
+                    const successMessage = "\n" + ANSI.RESET + ANSI.GREEN + "✓ Active file selected:" + ANSI.RESET + "\n" +
+                        ANSI.RESET + "  " + ANSI.LIGHTBLUE + "File: " + ANSI.RESET + ANSI.WHITE + file[0] + ANSI.RESET + "\n" +
+                        ANSI.RESET + "  " + ANSI.LIGHTBLUE + "Process: " + ANSI.RESET + ANSI.WHITE + (file[1].process || "default") + ANSI.RESET + "\n"
+
+                    if (process) {
+                        addTerminalEntry(process, {
+                            type: 'output',
+                            content: successMessage,
+                            timestamp: Date.now()
+                        })
+                    }
+
+                    readlineRef.current.println("")
+                    readlineRef.current.println(ANSI.RESET + ANSI.GREEN + "✓ Active file selected:" + ANSI.RESET)
+                    readlineRef.current.println(ANSI.RESET + "  " + ANSI.LIGHTBLUE + "File: " + ANSI.RESET + ANSI.WHITE + file[0] + ANSI.RESET)
+                    readlineRef.current.println(ANSI.RESET + "  " + ANSI.LIGHTBLUE + "Process: " + ANSI.RESET + ANSI.WHITE + (file[1].process || "default") + ANSI.RESET)
+
+
                     break;
                 default:
                     // Add input to history
