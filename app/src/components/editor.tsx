@@ -12,7 +12,7 @@ import NotebookEditor from "./editor/notebook-editor";
 import { useTheme } from "@/components/theme-provider";
 import { getFileIconElement, parseOutput, stripAnsiCodes, isExecutionError, isErrorText } from "@/lib/utils";
 import { useSettings } from "@/hooks/use-settings";
-import { useTerminalState } from "@/hooks/use-terminal-state";
+
 import { MainnetAO } from "@/lib/ao";
 import { useActiveAddress, useApi } from "@arweave-wallet-kit/react";
 import { toast } from "sonner";
@@ -111,7 +111,7 @@ export default function Editor() {
     const { projects } = useProjects();
     const { theme } = useTheme();
     const settings = useSettings();
-    const { addToQueue } = useTerminalState(s => s.actions);
+
     const activeAddress = useActiveAddress();
     const [running, setRunning] = useState(false);
     const bottomPanelRef = useRef<ImperativePanelHandle>(null);
@@ -148,7 +148,7 @@ export default function Editor() {
         const responseTimeout = setTimeout(() => {
             if (!responseReceived) {
                 // Terminal didn't respond, add to queue
-                addToQueue(processId, terminalEntry);
+                // Terminal no longer has state, just log the output
                 console.log('Terminal not responding, added to queue:', output.slice(0, 50));
             }
             // Clean up listener

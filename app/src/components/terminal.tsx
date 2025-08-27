@@ -3,90 +3,16 @@ import { Terminal as XTerm } from '@xterm/xterm'
 import { useTheme } from './theme-provider'
 import { ANSI, cn, isExecutionError, parseOutput } from '@/lib/utils'
 import { useSettings } from '@/hooks/use-settings'
-import { useProjects, type File } from '@/hooks/use-projects'
+import { useProjects } from '@/hooks/use-projects'
 import { useGlobalState } from '@/hooks/use-global-state'
-import { useTerminalState, type TerminalHistoryEntry } from '@/hooks/use-terminal-state'
+
 import { FitAddon } from '@xterm/addon-fit'
-import { WebLinksAddon } from '@xterm/addon-web-links';
+import { WebLinksAddon } from '@xterm/addon-web-links'
 import { Readline } from 'xterm-readline'
 import '@xterm/xterm/css/xterm.css'
 import { MainnetAO } from '@/lib/ao'
 import { createSigner } from '@permaweb/aoconnect'
 import { useApi } from '@arweave-wallet-kit/react'
-
-// Utility function for pretty printing tables
-interface TableColumn {
-    header: string
-    key: string
-    align?: 'left' | 'right' | 'center'
-    maxWidth?: number
-}
-
-interface TableRow {
-    [key: string]: string | number
-}
-
-function createPrettyTable(data: TableRow[], columns: TableColumn[], highlightRowIndex?: number): string[] {
-    if (!data.length) return ['No data to display']
-
-    // Calculate column widths
-    const columnWidths = columns.map(col => {
-        const headerWidth = col.header.length
-        const maxDataWidth = Math.max(
-            ...data.map(row => String(row[col.key] || '').length)
-        )
-        const width = Math.max(headerWidth, maxDataWidth)
-        return col.maxWidth ? Math.min(width, col.maxWidth) : width
-    })
-
-    // Helper function to pad text based on alignment
-    const padText = (text: string, width: number, align: 'left' | 'right' | 'center' = 'left'): string => {
-        const truncated = text.length > width ? text.substring(0, width - 3) + '...' : text
-        const padding = width - truncated.length
-
-        switch (align) {
-            case 'right':
-                return ' '.repeat(padding) + truncated
-            case 'center':
-                const leftPad = Math.floor(padding / 2)
-                const rightPad = padding - leftPad
-                return ' '.repeat(leftPad) + truncated + ' '.repeat(rightPad)
-            default:
-                return truncated + ' '.repeat(padding)
-        }
-    }
-
-    const lines: string[] = []
-
-    // Create header row
-    const headerRow = columns.map((col, i) =>
-        padText(col.header, columnWidths[i], col.align)
-    ).join(' │ ')
-    lines.push('┌─' + columnWidths.map(w => '─'.repeat(w)).join('─┬─') + '─┐')
-    lines.push('│ ' + headerRow + ' │')
-
-    // Create separator
-    lines.push('├─' + columnWidths.map(w => '─'.repeat(w)).join('─┼─') + '─┤')
-
-    // Create data rows
-    data.forEach((row, rowIndex) => {
-        const dataRow = columns.map((col, i) =>
-            padText(String(row[col.key] || ''), columnWidths[i], col.align)
-        ).join(' │ ')
-
-        // Highlight the row if it matches the highlightRowIndex
-        if (highlightRowIndex !== undefined && rowIndex === highlightRowIndex) {
-            lines.push('│ ' + ANSI.LIGHTGREEN + dataRow + ANSI.RESET + ' │')
-        } else {
-            lines.push('│ ' + dataRow + ' │')
-        }
-    })
-
-    // Create bottom border
-    lines.push('└─' + columnWidths.map(w => '─'.repeat(w)).join('─┴─') + '─┘')
-
-    return lines
-}
 
 const AOS_ASCII = String.raw`
       ___           ___           ___     
@@ -114,57 +40,44 @@ export default function Terminal() {
     const readlineRef = useRef<Readline | null>(null)
     const resizeObserverRef = useRef<ResizeObserver | null>(null)
     const [isReady, setIsReady] = useState(false)
-    const [prompt, setPrompt] = useState("aos> ")
-    // Terminal state management
-    const { addTerminalEntry, setTerminalPrompt, clearTerminalHistory, getTerminalState, processQueue, setActiveFile: setTerminalActiveFile } = useTerminalState(s => s.actions)
-    const terminalState = process ? getTerminalState(process) : { history: [], prompt: "aos> ", activeFile: null }
-    const activeFile = terminalState.activeFile
 
-    // Validation function to check if terminal state is valid
-    const validateTerminalState = useCallback(() => {
-        if (!process || !project) return true
+    const prompt = "lua> " // Simple hardcoded prompt
 
-        const currentTerminalState = getTerminalState(process)
-        const activeFile = currentTerminalState.activeFile
+    // Spinner state
+    const spinnerIntervalRef = useRef<NodeJS.Timeout | null>(null)
+    const spinnerChars = "⣷⣯⣟⡿⢿⣻⣽⣾".split("")
+    const spinnerIndexRef = useRef(0)
 
-        // If no active file in terminal state, it's valid
-        if (!activeFile || !activeFile.name) return true
-
-        // Check if the file still exists in the project
-        const projectFile = project.files[activeFile.name]
-        if (!projectFile) {
-            console.log(`Terminal validation: File ${activeFile.name} no longer exists in project`)
-            return false
+    // Spinner functions
+    const startSpinner = useCallback(() => {
+        if (spinnerIntervalRef.current) {
+            clearInterval(spinnerIntervalRef.current)
         }
-
-        // Check if the process ID matches
-        const currentFileProcess = projectFile.process || project.process
-        const terminalFileProcess = activeFile.process || project.process
-
-        if (currentFileProcess !== terminalFileProcess) {
-            console.log(`Terminal validation: Process ID mismatch for ${activeFile.name}. Current: ${currentFileProcess}, Terminal: ${terminalFileProcess}`)
-            return false
-        }
-
-        return true
-    }, [process, project, getTerminalState])
-
-    // Reset terminal state when validation fails
-    const resetTerminalStateIfInvalid = useCallback(() => {
-        if (!process || !validateTerminalState()) {
-            console.log('Resetting terminal state due to validation failure')
-            setTerminalActiveFile(process, null)
-            clearTerminalHistory(process)
-        }
-    }, [process, validateTerminalState, setTerminalActiveFile, clearTerminalHistory])
-
-    // Function to generate prompt with active file prefix
-    const generatePromptWithFile = useCallback((basePrompt: string, activeFile: File | null): string => {
-        if (!activeFile || !activeFile.name) {
-            return basePrompt
-        }
-        return `${ANSI.DIM}${activeFile.name}>${ANSI.RESET}${basePrompt}`
+        spinnerIntervalRef.current = setInterval(() => {
+            if (xtermRef.current) {
+                const spinnerChar = spinnerChars[spinnerIndexRef.current++ % spinnerChars.length]
+                xtermRef.current.write(ANSI.RESET + ANSI.GREEN + "\r" + spinnerChar + " computing... " + ANSI.RESET)
+            }
+        }, 100)
     }, [])
+
+    const stopSpinner = useCallback(() => {
+        if (spinnerIntervalRef.current) {
+            clearInterval(spinnerIntervalRef.current)
+            spinnerIntervalRef.current = null
+        }
+        if (xtermRef.current) {
+            xtermRef.current.write('\r' + ' '.repeat(15) + '\r') // Clear the spinner area
+        }
+    }, [])
+
+    const { theme } = useTheme()
+    const api = useApi()
+    const ao = new MainnetAO({
+        HB_URL: settings.HB_URL,
+        GATEWAY_URL: settings.GATEWAY_URL,
+        signer: createSigner(api)
+    })
 
     // Function to beautify error output
     const beautifyErrorOutput = useCallback((errorText: string): string => {
@@ -199,45 +112,6 @@ export default function Terminal() {
         return formattedError.trim()
     }, [])
 
-    // Spinner state
-    const spinnerIntervalRef = useRef<NodeJS.Timeout | null>(null)
-    // const spinnerChars = ['▖', '▘', '▝', '▗']
-    // const spinnerChars = "⢎⡰,⢎⡡,⢎⡑,⢎⠱,⠎⡱,⢊⡱,⢌⡱,⢆⡱".split(",")
-    const spinnerChars = "⣷⣯⣟⡿⢿⣻⣽⣾".split("")
-    // const spinnerChars = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏".split("")
-    const spinnerIndexRef = useRef(0)
-
-    // Spinner functions
-    const startSpinner = useCallback(() => {
-        if (spinnerIntervalRef.current) {
-            clearInterval(spinnerIntervalRef.current)
-        }
-        spinnerIntervalRef.current = setInterval(() => {
-            if (xtermRef.current) {
-                const spinnerChar = spinnerChars[spinnerIndexRef.current++ % spinnerChars.length]
-                xtermRef.current.write(ANSI.RESET + ANSI.GREEN + "\r" + spinnerChar + " computing... " + ANSI.RESET)
-            }
-        }, 100)
-    }, [])
-
-    const stopSpinner = useCallback(() => {
-        if (spinnerIntervalRef.current) {
-            clearInterval(spinnerIntervalRef.current)
-            spinnerIntervalRef.current = null
-        }
-        if (xtermRef.current) {
-            xtermRef.current.write('\r' + ' '.repeat(15) + '\r') // Clear the spinner area (computing [x] is ~13 chars)
-        }
-    }, [])
-
-    const { theme } = useTheme()
-    const api = useApi()
-    const ao = new MainnetAO({
-        HB_URL: settings.HB_URL,
-        GATEWAY_URL: settings.GATEWAY_URL,
-        signer: createSigner(api)
-    })
-
     // Function to show initial terminal state (ASCII art + connection message)
     const showInitialTerminalState = useCallback(() => {
         if (!xtermRef.current || !process) return
@@ -256,20 +130,11 @@ export default function Terminal() {
             }
         })
 
-        // Determine which process to display and build connection message
-        const terminalState = getTerminalState(process)
-        const displayProcess = terminalState.activeFile?.process || process
-
-        let connectionMessage = "\n" + ANSI.RESET + ANSI.DIM + "Connected to process: " + ANSI.RESET + ANSI.LIGHTBLUE + displayProcess + ANSI.RESET
-
-        // Add filename if active file is available
-        if (terminalState.activeFile?.name) {
-            connectionMessage += ANSI.RESET + ANSI.DIM + " (" + ANSI.RESET + ANSI.WHITE + terminalState.activeFile.name + ANSI.RESET + ANSI.DIM + ")" + ANSI.RESET
-        }
+        let connectionMessage = "\n" + ANSI.RESET + ANSI.DIM + "Connected to process: " + ANSI.RESET + ANSI.LIGHTBLUE + process + ANSI.RESET
 
         xtermRef.current.write(connectionMessage)
         xtermRef.current.write('\n\r\n')
-    }, [process, getTerminalState])
+    }, [process])
 
     // Helper function to write multi-line content with proper formatting
     const writeMultiLineContent = useCallback((content: string, prefix: string = '', suffix: string = '') => {
@@ -287,132 +152,27 @@ export default function Terminal() {
         xtermRef.current!.write('\r\n')
     }, [])
 
-    // Function to restore terminal history
-    const restoreTerminalHistory = useCallback(() => {
+    // Function to show initial terminal state only
+    const initializeTerminal = useCallback(() => {
         if (!xtermRef.current || !process) return
-
-        const state = getTerminalState(process)
-
-        // Show initial state first
-        showInitialTerminalState()
-
-        // Restore history
-        state.history.forEach(entry => {
-            switch (entry.type) {
-                case 'input':
-                    const inputPrompt = generatePromptWithFile(state.prompt, state.activeFile)
-                    xtermRef.current!.write(ANSI.RESET + inputPrompt + entry.content + '\r\n')
-                    break
-                case 'output':
-                    writeMultiLineContent(entry.content, ANSI.RESET)
-                    break
-                case 'error':
-                    writeMultiLineContent(entry.content, ANSI.RESET + ANSI.RED, ANSI.RESET)
-                    break
-                case 'system':
-                    writeMultiLineContent(entry.content, ANSI.RESET + ANSI.DIM, ANSI.RESET)
-                    break
-            }
-        })
-
-        // Process queued entries and display them
-        const queuedEntries = processQueue(process)
-        queuedEntries.forEach(entry => {
-            switch (entry.type) {
-                case 'input':
-                    const queueInputPrompt = generatePromptWithFile(state.prompt, state.activeFile)
-                    xtermRef.current!.write(ANSI.RESET + queueInputPrompt + entry.content + '\r\n')
-                    break
-                case 'output':
-                    writeMultiLineContent(entry.content, ANSI.RESET)
-                    break
-                case 'error':
-                    writeMultiLineContent(entry.content, ANSI.RESET + ANSI.RED, ANSI.RESET)
-                    break
-                case 'system':
-                    writeMultiLineContent(entry.content, ANSI.RESET + ANSI.DIM, ANSI.RESET)
-                    break
-            }
-        })
-
-        // Set the current prompt
-        setPrompt(state.prompt)
-
-        // Always show the current prompt in the terminal so user knows where to type
-        const displayPrompt = generatePromptWithFile(state.prompt, state.activeFile)
-        xtermRef.current!.write(ANSI.RESET + displayPrompt)
-    }, [process, getTerminalState, showInitialTerminalState, processQueue, writeMultiLineContent, generatePromptWithFile])
-
-    // Function to clear terminal to initial state
-    const clearTerminalToInitialState = useCallback(() => {
-        if (!process || !xtermRef.current) return
-
-        // Get current prompt before clearing
-        const currentPrompt = prompt
-
-        // Clear the stored history but preserve the prompt
-        clearTerminalHistory(process)
-
-        // Restore the prompt that was cleared
-        setTerminalPrompt(process, currentPrompt)
 
         // Show initial state
         showInitialTerminalState()
 
         // Show the current prompt in the terminal so user knows where to type
-        const terminalState = getTerminalState(process)
-        const displayPrompt = generatePromptWithFile(currentPrompt, terminalState.activeFile)
-        xtermRef.current.write(ANSI.RESET + displayPrompt)
-    }, [process, prompt, clearTerminalHistory, setTerminalPrompt, showInitialTerminalState, getTerminalState, generatePromptWithFile])
+        xtermRef.current!.write(ANSI.RESET + prompt)
+    }, [process, showInitialTerminalState, prompt])
 
+    // Function to clear terminal to initial state
+    const clearTerminalToInitialState = useCallback(() => {
+        if (!process || !xtermRef.current) return
 
-    useEffect(() => {
-        if (!process) return
+        // Show initial state
+        showInitialTerminalState()
 
-        // Always use stored prompt first, then fetch from server if needed
-        const storedState = getTerminalState(process)
-
-        // Set the stored prompt immediately
-        setPrompt(storedState.prompt)
-
-        // Only fetch from server if we don't have a stored prompt or it's the default
-        if (!storedState.prompt || storedState.prompt === "aos> ") {
-            const hashpath = `${settings.HB_URL}/${process}/now/results/output/prompt/~json@1.0/serialize`
-            fetch(hashpath).then(res => res.json()).then(data => {
-                const newPrompt = data.body || "aos> "
-                setPrompt(newPrompt)
-                setTerminalPrompt(process, newPrompt)
-            }).catch(() => {
-                // Keep the current stored prompt on error
-                const currentPrompt = getTerminalState(process).prompt
-                setPrompt(currentPrompt)
-            })
-        }
-    }, [process, theme, getTerminalState, setTerminalPrompt])
-
-    // Validate terminal state when terminal becomes active or project changes
-    useEffect(() => {
-        if (!process || !project || !isReady) return
-
-        // Run validation when terminal becomes active
-        resetTerminalStateIfInvalid()
-    }, [process, project, isReady, resetTerminalStateIfInvalid])
-
-    // Update prompt display when active file changes
-    useEffect(() => {
-        if (!xtermRef.current || !readlineRef.current || !isReady || !process) return
-
-        // Get the current terminal state to check for active file changes
-        const currentTerminalState = getTerminalState(process)
-
-        // Update the displayed prompt to reflect the active file
-        const basePrompt = typeof prompt === 'string' && prompt.length > 0 ? prompt : "aos> "
-        const displayPrompt = generatePromptWithFile(basePrompt, currentTerminalState.activeFile)
-
-        // Clear the current line and write the new prompt
-        xtermRef.current.write('\r' + ' '.repeat(100) + '\r') // Clear current line
-        xtermRef.current.write(displayPrompt)
-    }, [activeFile, prompt, isReady, process, getTerminalState, generatePromptWithFile])
+        // Show the current prompt in the terminal so user knows where to type
+        xtermRef.current.write(ANSI.RESET + prompt)
+    }, [process, showInitialTerminalState, prompt])
 
     // Get theme configuration
     const getThemeConfig = (currentTheme: string) => {
@@ -507,9 +267,9 @@ export default function Terminal() {
 
         setIsReady(true)
 
-        // Restore terminal history after terminal is ready
+        // Initialize terminal after terminal is ready
         setTimeout(() => {
-            restoreTerminalHistory()
+            initializeTerminal()
         }, 100)
 
         function logOutput(event: Event) {
@@ -518,25 +278,15 @@ export default function Terminal() {
             const eventId = eventDetail.eventId
 
             console.log(output)
-            if (xtermRef.current && readlineRef.current && process) {
+            if (xtermRef.current && readlineRef.current) {
                 // Clear the current line before logging output
                 xtermRef.current.write(ANSI.CLEARLINE)
-
-                // Add the output to terminal history so it persists
-                addTerminalEntry(process, {
-                    type: 'output',
-                    content: output.trim(),
-                    timestamp: Date.now()
-                })
 
                 // Use println to properly handle the output with newlines
                 readlineRef.current.println(ANSI.RESET + output.trim() + ANSI.RESET)
 
                 // Ensure the prompt is shown after the output
-                const basePrompt = typeof prompt === 'string' && prompt.length > 0 ? prompt : "aos> "
-                const terminalState = getTerminalState(process)
-                const displayPrompt = generatePromptWithFile(basePrompt, terminalState.activeFile)
-                xtermRef.current.write(displayPrompt)
+                xtermRef.current.write(prompt)
 
                 // Send response back to the triggering component if eventId is provided
                 if (eventId) {
@@ -567,9 +317,7 @@ export default function Terminal() {
 
             window.removeEventListener("log-output", logOutput)
         }
-    }, [theme, restoreTerminalHistory, clearTerminalToInitialState])
-
-
+    }, [theme, initializeTerminal, clearTerminalToInitialState])
 
     // Fit terminal to container with debouncing
     const fitTerminal = useCallback(() => {
@@ -644,17 +392,7 @@ export default function Terminal() {
                 readlineRef.current.println(ANSI.RESET + ANSI.RED + "[Go into Settings > Project and set or create a new process]" + ANSI.RESET);
                 return
             }
-            const basePrompt = typeof prompt === 'string' && prompt.length > 0 ? prompt : "aos> "
-            const terminalState = getTerminalState(process)
-            const displayPrompt = generatePromptWithFile(basePrompt, terminalState.activeFile)
-            readlineRef.current.read(displayPrompt).then(processLine);
-        }
-
-        function clearLines(count: number) {
-            for (let i = 0; i < count; i++) {
-                xtermRef.current.write('\x1b[A'); // Move up 1 line
-                xtermRef.current.write('\x1b[2K'); // Clear current line
-            }
+            readlineRef.current.read(prompt).then(processLine);
         }
 
         async function processLine(text: string) {
@@ -666,230 +404,12 @@ export default function Terminal() {
                 case "clear":
                     clearTerminalToInitialState()
                     break;
-                case ".list":
-                case "ls":
-                    // Add input to history
-                    if (process) {
-                        addTerminalEntry(process, {
-                            type: 'input',
-                            content: text,
-                            timestamp: Date.now()
-                        })
-                    }
-                    // list project files and their processes in a table format (lua and luanb only)
-                    const files = project?.files
-                    if (!files || Object.keys(files).length === 0) {
-                        readlineRef.current.println(ANSI.RESET + ANSI.YELLOW + "No files found in project" + ANSI.RESET)
-                        break
-                    }
-
-                    const tableData = Object.entries(files)
-                        .filter(([filename, file]: [string, any]) =>
-                            filename.endsWith('.lua') || filename.endsWith('.luanb')
-                        )
-                        .map(([filename, file]: [string, any], index) => ({
-                            index: (index + 1).toString(),
-                            name: filename,
-                            process: file.process || 'default'
-                        }))
-
-                    if (tableData.length === 0) {
-                        readlineRef.current.println(ANSI.RESET + ANSI.YELLOW + "No Lua files found in project" + ANSI.RESET)
-                        break
-                    }
-
-                    // Find the index of the active file to highlight it (from terminal state)
-                    const terminalState = getTerminalState(process)
-                    const activeFileName = terminalState.activeFile?.name
-                    const activeFileIndex = activeFileName ? tableData.findIndex(row => row.name === activeFileName) : -1
-
-                    const columns: TableColumn[] = [
-                        { header: '#', key: 'index', align: 'right', maxWidth: 3 },
-                        { header: 'File Name', key: 'name', align: 'left', maxWidth: 20 },
-                        { header: 'Process ID', key: 'process', align: 'left', maxWidth: 45 }
-                    ]
-
-                    const tableLines = createPrettyTable(tableData, columns, activeFileIndex >= 0 ? activeFileIndex : undefined)
-
-                    // Apply green color to table lines for both display and history storage
-                    const coloredTableLines = tableLines.map(line => ANSI.RESET + ANSI.GREEN + line + ANSI.RESET)
-
-                    // Add instructional message
-                    const instructionalMessage = "\n" + ANSI.RESET + ANSI.DIM + "Use " + ANSI.RESET + ANSI.CYAN + ".select <#>" + ANSI.RESET + ANSI.DIM + " to set the active file for this terminal" + ANSI.RESET
-
-                    // Add terminal entry for the table output with colors preserved
-                    if (process) {
-                        addTerminalEntry(process, {
-                            type: 'output',
-                            content: coloredTableLines.join('\n') + instructionalMessage,
-                            timestamp: Date.now()
-                        })
-                    }
-
-                    // Print each line of the table
-                    coloredTableLines.forEach(line => {
-                        readlineRef.current.println(line)
-                    })
-
-                    // Add instructional message
-                    readlineRef.current.println("")
-                    readlineRef.current.println(ANSI.RESET + ANSI.DIM + "Use " + ANSI.RESET + ANSI.CYAN + ".select <#>" + ANSI.RESET + ANSI.DIM + " to set the active file for this terminal" + ANSI.RESET)
-                    break;
-                case ".select":
-                    // Add input to history
-                    if (process) {
-                        addTerminalEntry(process, {
-                            type: 'input',
-                            content: text,
-                            timestamp: Date.now()
-                        })
-                    }
-
-                    const indexStr = text.split(" ")[1]
-
-                    // Validate input
-                    if (!indexStr) {
-                        const errorMessage = "\n" + ANSI.RESET + ANSI.RED + "✗ Error: " + ANSI.RESET + "Please specify a file index\n" +
-                            ANSI.RESET + ANSI.DIM + "  Usage: " + ANSI.RESET + ANSI.CYAN + ".select <#>" + ANSI.RESET + "\n" +
-                            ANSI.RESET + ANSI.DIM + "  Run " + ANSI.RESET + ANSI.CYAN + ".list" + ANSI.RESET + ANSI.DIM + " to see available files" + ANSI.RESET
-
-                        if (process) {
-                            addTerminalEntry(process, {
-                                type: 'error',
-                                content: errorMessage,
-                                timestamp: Date.now()
-                            })
-                        }
-
-                        readlineRef.current.println("")
-                        readlineRef.current.println(ANSI.RESET + ANSI.RED + "✗ Error: " + ANSI.RESET + "Please specify a file index")
-                        readlineRef.current.println(ANSI.RESET + ANSI.DIM + "  Usage: " + ANSI.RESET + ANSI.CYAN + ".select <#>" + ANSI.RESET)
-                        readlineRef.current.println(ANSI.RESET + ANSI.DIM + "  Run " + ANSI.RESET + ANSI.CYAN + ".list" + ANSI.RESET + ANSI.DIM + " to see available files" + ANSI.RESET)
-                        break
-                    }
-
-                    const index = parseInt(indexStr)
-
-                    if (isNaN(index)) {
-                        const errorMessage = "\n" + ANSI.RESET + ANSI.RED + "✗ Error: " + ANSI.RESET + "Invalid file index '" + indexStr + "'\n" +
-                            ANSI.RESET + ANSI.DIM + "  Please use a numeric index from the " + ANSI.RESET + ANSI.CYAN + ".list" + ANSI.RESET + ANSI.DIM + " command" + ANSI.RESET
-
-                        if (process) {
-                            addTerminalEntry(process, {
-                                type: 'error',
-                                content: errorMessage,
-                                timestamp: Date.now()
-                            })
-                        }
-
-                        readlineRef.current.println("")
-                        readlineRef.current.println(ANSI.RESET + ANSI.RED + "✗ Error: " + ANSI.RESET + "Invalid file index '" + indexStr + "'")
-                        readlineRef.current.println(ANSI.RESET + ANSI.DIM + "  Please use a numeric index from the " + ANSI.RESET + ANSI.CYAN + ".list" + ANSI.RESET + ANSI.DIM + " command" + ANSI.RESET)
-                        break
-                    }
-
-                    // Filter to only Lua files (same as .list command)
-                    const luaFiles = Object.entries(project?.files || {})
-                        .filter(([filename, file]: [string, any]) =>
-                            filename.endsWith('.lua') || filename.endsWith('.luanb')
-                        )
-
-                    // Convert 1-based index to 0-based for array access
-                    const arrayIndex = index - 1
-
-                    if (index < 1 || index > luaFiles.length) {
-                        const errorMessage = "\n" + ANSI.RESET + ANSI.RED + "✗ Error: " + ANSI.RESET + "File index " + index + " is out of range\n" +
-                            ANSI.RESET + ANSI.DIM + "  Available indices: 1-" + luaFiles.length + ANSI.RESET + "\n" +
-                            ANSI.RESET + ANSI.DIM + "  Run " + ANSI.RESET + ANSI.CYAN + ".list" + ANSI.RESET + ANSI.DIM + " to see available files" + ANSI.RESET
-
-                        if (process) {
-                            addTerminalEntry(process, {
-                                type: 'error',
-                                content: errorMessage,
-                                timestamp: Date.now()
-                            })
-                        }
-
-                        readlineRef.current.println("")
-                        readlineRef.current.println(ANSI.RESET + ANSI.RED + "✗ Error: " + ANSI.RESET + "File index " + index + " is out of range")
-                        readlineRef.current.println(ANSI.RESET + ANSI.DIM + "  Available indices: 1-" + luaFiles.length + ANSI.RESET)
-                        readlineRef.current.println(ANSI.RESET + ANSI.DIM + "  Run " + ANSI.RESET + ANSI.CYAN + ".list" + ANSI.RESET + ANSI.DIM + " to see available files" + ANSI.RESET)
-                        break
-                    }
-
-                    const file = luaFiles[arrayIndex]
-
-                    // Set the active file in terminal state
-                    if (process) {
-                        setTerminalActiveFile(process, file[1])
-                    }
-
-                    // Update the prompt display immediately to reflect the new active file
-                    setTimeout(() => {
-                        if (xtermRef.current && readlineRef.current) {
-                            const basePrompt = typeof prompt === 'string' && prompt.length > 0 ? prompt : "aos> "
-                            const newTerminalState = getTerminalState(process)
-                            const displayPrompt = generatePromptWithFile(basePrompt, newTerminalState.activeFile)
-                            xtermRef.current.write('\r' + ' '.repeat(100) + '\r') // Clear current line
-                            xtermRef.current.write(displayPrompt)
-                        }
-                    }, 10)
-
-                    // Beautiful success message
-                    const successMessage = "\n" + ANSI.RESET + ANSI.GREEN + "✓ Active file selected:" + ANSI.RESET + "\n" +
-                        ANSI.RESET + "  " + ANSI.LIGHTBLUE + "File: " + ANSI.RESET + ANSI.WHITE + file[0] + ANSI.RESET + "\n" +
-                        ANSI.RESET + "  " + ANSI.LIGHTBLUE + "Process: " + ANSI.RESET + ANSI.WHITE + (file[1].process || "default") + ANSI.RESET + "\n"
-
-                    if (process) {
-                        addTerminalEntry(process, {
-                            type: 'output',
-                            content: successMessage,
-                            timestamp: Date.now()
-                        })
-                    }
-
-                    readlineRef.current.println("")
-                    readlineRef.current.println(ANSI.RESET + ANSI.GREEN + "✓ Active file selected:" + ANSI.RESET)
-                    readlineRef.current.println(ANSI.RESET + "  " + ANSI.LIGHTBLUE + "File: " + ANSI.RESET + ANSI.WHITE + file[0] + ANSI.RESET)
-                    readlineRef.current.println(ANSI.RESET + "  " + ANSI.LIGHTBLUE + "Process: " + ANSI.RESET + ANSI.WHITE + (file[1].process || "default") + ANSI.RESET)
-
-
-                    break;
-                case ".reset":
-                    if (process) {
-                        setTerminalActiveFile(process, null)
-                    }
-
-                    // Update the prompt display immediately to reflect no active file
-                    setTimeout(() => {
-                        if (xtermRef.current && readlineRef.current) {
-                            const basePrompt = typeof prompt === 'string' && prompt.length > 0 ? prompt : "aos> "
-                            const newTerminalState = getTerminalState(process)
-                            const displayPrompt = generatePromptWithFile(basePrompt, newTerminalState.activeFile)
-                            xtermRef.current.write('\r' + ' '.repeat(100) + '\r') // Clear current line
-                            xtermRef.current.write(displayPrompt)
-                        }
-                    }, 10)
-
-                    readlineRef.current.println(ANSI.RESET + ANSI.GREEN + "✓ Reset terminal active file" + ANSI.RESET)
-                    break;
                 default:
-                    // Add input to history
-                    if (process) {
-                        addTerminalEntry(process, {
-                            type: 'input',
-                            content: text,
-                            timestamp: Date.now()
-                        })
-                    }
-
                     // Start spinner
                     startSpinner();
 
                     try {
-                        const terminalState = getTerminalState(process)
-                        const activeFileProcessId = terminalState.activeFile?.process
-                        const result = await ao.runLua({ processId: (activeFileProcessId || process), code: text })
+                        const result = await ao.runLua({ processId: process, code: text })
                         console.log(result)
 
                         // Stop spinner and clear only the spinner line
@@ -899,22 +419,8 @@ export default function Terminal() {
                         const hasError = isExecutionError(result)
                         const parsedOutput = parseOutput(result)
 
-                        const newPrompt = result.output?.prompt || result.prompt
-                        const finalPrompt = typeof newPrompt === 'string' && newPrompt.length > 0 ? newPrompt : prompt
-                        setPrompt(finalPrompt)
-
                         // Prepare output content with appropriate styling
                         const displayContent = hasError ? beautifyErrorOutput(parsedOutput) : parsedOutput
-
-                        // Update stored prompt and add to history with appropriate type
-                        if (process) {
-                            setTerminalPrompt(process, finalPrompt)
-                            addTerminalEntry(process, {
-                                type: hasError ? 'error' : 'output',
-                                content: displayContent,
-                                timestamp: Date.now()
-                            })
-                        }
 
                         // Print the output with appropriate styling
                         readlineRef.current.println(displayContent)
@@ -926,15 +432,6 @@ export default function Terminal() {
                             ANSI.RESET + "  " + ANSI.RED + (error.message || 'Unknown error') + ANSI.RESET + "\n" +
                             ANSI.RESET + ANSI.DIM + "  Check your connection and try again" + ANSI.RESET
 
-                        // Add error to history
-                        if (process) {
-                            addTerminalEntry(process, {
-                                type: 'error',
-                                content: beautifiedCatchError,
-                                timestamp: Date.now()
-                            })
-                        }
-
                         // Print the error on a new line (command remains visible)
                         readlineRef.current.println(beautifiedCatchError)
                     }
@@ -945,7 +442,7 @@ export default function Terminal() {
 
         readLine()
 
-    }, [isReady, readlineRef, xtermRef, prompt, theme, activeFile, process, addTerminalEntry, setTerminalPrompt, clearTerminalHistory, restoreTerminalHistory, clearTerminalToInitialState, ao, startSpinner, stopSpinner, getTerminalState, generatePromptWithFile, beautifyErrorOutput])
+    }, [isReady, readlineRef, xtermRef, prompt, theme, process, clearTerminalToInitialState, ao, startSpinner, stopSpinner, beautifyErrorOutput])
 
     return (
         <div className={cn("h-full w-full flex flex-col px-1.5 m-0", theme === "dark" ? "bg-black" : "bg-white")}>

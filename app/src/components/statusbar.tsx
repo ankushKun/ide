@@ -9,7 +9,7 @@ import { ThemeToggleButton } from "./theme-toggle";
 import { useGlobalState } from "@/hooks/use-global-state";
 import { useProjects } from "@/hooks/use-projects";
 import { useSettings } from "@/hooks/use-settings";
-import { useTerminalState } from "@/hooks/use-terminal-state";
+
 import { startLiveMonitoring } from "@/lib/live-mainnet";
 import { MainnetAO } from "@/lib/ao";
 import { createSigner } from "@permaweb/aoconnect";
@@ -22,7 +22,7 @@ export default function Statusbar() {
     const globalState = useGlobalState();
     const projects = useProjects();
     const settings = useSettings();
-    const { hasShownSlot, addShownSlot, addToQueue } = useTerminalState(s => s.actions);
+
     const [mounted, setMounted] = useState(false);
     const [performance, setPerformance] = useState({ memory: 0 });
     const stopMonitoringRef = useRef<(() => void) | null>(null);
@@ -95,7 +95,7 @@ export default function Statusbar() {
         const responseTimeout = setTimeout(() => {
             if (!responseReceived) {
                 // Terminal didn't respond, add to queue
-                addToQueue(projectProcessId, terminalEntry);
+                // Terminal no longer has state, just log the output
                 console.log('Terminal not responding, added to queue:', output.slice(0, 50));
             }
             // Clean up listener
@@ -137,8 +137,6 @@ export default function Statusbar() {
                 hbUrl,
                 gatewayUrl,
                 intervalMs: 2000,
-                hasShownSlot: (slot: number) => hasShownSlot(projectProcessId, slot),
-                markSlotAsShown: (slot: number) => addShownSlot(projectProcessId, slot),
                 onResult: (result) => {
                     // Only send to terminal if there's new data with print output
                     if (result.hasNewData && result.hasPrint) {
@@ -159,7 +157,7 @@ export default function Statusbar() {
                 stopMonitoringRef.current = null;
             }
         };
-    }, [projectProcessId, activeProject?.isMainnet, settings, hasShownSlot, addShownSlot])
+    }, [projectProcessId, activeProject?.isMainnet, settings])
 
     useEffect(() => {
         function syncProjectToProcess() {
