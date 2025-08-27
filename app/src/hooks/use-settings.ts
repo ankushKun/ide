@@ -6,7 +6,7 @@ export const DEFAULT_SETTINGS = {
     // Network URLs
     CU_URL: "https://cu.arnode.asia",
     GATEWAY_URL: "https://arweave.net",
-    HB_URL: "https://tee-3.forward.computer", // Hyperbeam URL
+    HB_URL: "https://scheduler.forward.computer", // Hyperbeam URL
 
     // Editor preferences
     VIM_MODE: false,
