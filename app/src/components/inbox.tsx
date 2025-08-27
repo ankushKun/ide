@@ -445,7 +445,7 @@ export default function Inbox() {
                             </div>
                             <h1 className="font-semibold">Inbox</h1>
                         </div>
-                        <Select value={selectedProcessId} onValueChange={setSelectedProcessId}>
+                        {availableProcesses.length > 1 && <Select value={selectedProcessId} onValueChange={setSelectedProcessId}>
                             <SelectTrigger className="h-8 text-xs w-full !bg-background border-none !border-b">
                                 <SelectValue placeholder="Select process..." />
                             </SelectTrigger>
@@ -458,7 +458,7 @@ export default function Inbox() {
                                     </SelectItem>
                                 ))}
                             </SelectContent>
-                        </Select>
+                        </Select>}
                         <Button
                             variant="ghost"
                             size="sm"
