@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { Terminal as XTerm } from '@xterm/xterm'
-import { useTheme } from './theme-provider'
+import { useTheme } from '../theme-provider'
 import { ANSI, cn, isExecutionError, parseOutput } from '@/lib/utils'
 import { useSettings } from '@/hooks/use-settings'
 import { useProjects } from '@/hooks/use-projects'

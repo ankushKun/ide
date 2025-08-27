@@ -12,8 +12,8 @@ import { cn, shortenAddress } from "@/lib/utils";
 import { MainnetAO, type Tag } from "@/lib/ao";
 import { useSettings } from "@/hooks/use-settings";
 import React from "react";
-import JsonViewer from "./ui/json-viewer";
-import OutputViewer from "./ui/output-viewer";
+import JsonViewer from "../ui/json-viewer";
+import OutputViewer from "../ui/output-viewer";
 
 interface Commitment {
     bundle: string;

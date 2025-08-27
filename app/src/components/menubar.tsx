@@ -52,6 +52,8 @@ import {
 import { fetchProjectFromProcess, isValidArweaveId, validateArweaveId } from "@/lib/utils"
 import { useSettings } from "@/hooks/use-settings"
 import { useActiveAddress } from "@arweave-wallet-kit/react"
+import PanelBottom from "@/assets/icons/panel-bottom"
+import PanelLeft from "@/assets/icons/panel-left"
 
 const link = [
     {
@@ -90,7 +92,7 @@ const learningResources = [
 ]
 
 export default function Menubar() {
-    const { activeProject, activeFile, activeView, actions: globalActions } = useGlobalState()
+    const { activeProject, activeFile, activeView, actions: globalActions, drawerOpen, bottomPanelOpen } = useGlobalState()
     const { projects, actions: projectActions } = useProjects()
     const [isCreatingProject, setIsCreatingProject] = useState(false)
     const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
@@ -971,7 +973,13 @@ export default function Menubar() {
             onOpenChange={setIsShortcutsOpen}
         />
 
+
         <div className="grow"></div>
+        <div className="flex items-center justify-center gap-1 text-muted-foreground">
+            <PanelLeft filled={drawerOpen} onClick={() => globalActions.setDrawerOpen(!drawerOpen)} />
+            <PanelBottom filled={bottomPanelOpen} onClick={() => { globalActions.setBottomPanelOpen(!bottomPanelOpen) }} />
+        </div>
+        <div className="ml-2"></div>
         {link.map((item, index) => (
             <Link key={index} to={item.link} target="_blank" className="h-full w-6 hover:bg-accent/80 flex items-center justify-center transition-colors text-muted-foreground hover:text-foreground">
                 <item.icon size={16} />

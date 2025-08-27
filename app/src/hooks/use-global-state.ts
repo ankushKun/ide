@@ -21,7 +21,7 @@ export interface HistoryEntry {
 interface GlobalStateActions {
     setActiveTab: (tab: SidebarTabs) => void,
     setDrawerOpen: (open: boolean) => void
-
+    setBottomPanelOpen: (open: boolean) => void
     setActiveProject: (projectId: string) => void
     setActiveFile: (fileName: string) => void
     setActiveView: (view: ViewOptions | null) => void
@@ -42,6 +42,7 @@ export interface GlobalState {
     activeFile: string
     openedFiles: string[]
     drawerOpen: boolean
+    bottomPanelOpen: boolean
     output: string
     history: HistoryEntry[]
     actions: GlobalStateActions
@@ -54,13 +55,14 @@ const globalStateStore = create<GlobalState>()(persist((set, get) => ({
     activeFile: "",
     openedFiles: [],
     drawerOpen: true,
+    bottomPanelOpen: true,
     output: "",
     history: [],
     actions: {
         setActiveTab: (tab: SidebarTabs) => set({ activeDrawer: tab }),
         setDrawerOpen: (open: boolean) => set({ drawerOpen: open }),
+        setBottomPanelOpen: (open: boolean) => set({ bottomPanelOpen: open }),
         setActiveView: (view: ViewOptions) => set({ activeView: view }),
-
         setActiveProject: (projectId: string) => set({
             activeProject: projectId,
             activeFile: "",

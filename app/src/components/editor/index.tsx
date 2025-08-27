@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useRef } from "react";
 import Terminal from "./terminal";
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "./ui/resizable";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "../ui/resizable";
 import { type ImperativePanelHandle } from "react-resizable-panels";
 import { useGlobalState } from "@/hooks/use-global-state";
 import { useProjects } from "@/hooks/use-projects";
-import { Button } from "./ui/button";
+import { Button } from "../ui/button";
 import { X, LoaderIcon, Play, PanelTopCloseIcon, PanelBottomClose, PanelTopClose } from "lucide-react";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
-import SingleFileEditor from "./editor/single-file-editor";
-import NotebookEditor from "./editor/notebook-editor";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "../ui/tabs";
+import SingleFileEditor from "./single-file-editor";
+import NotebookEditor from "./notebook-editor";
 import { useTheme } from "@/components/theme-provider";
 import { getFileIconElement, parseOutput, stripAnsiCodes, isExecutionError, isErrorText } from "@/lib/utils";
 import { useSettings } from "@/hooks/use-settings";
@@ -18,7 +18,7 @@ import { useActiveAddress, useApi } from "@arweave-wallet-kit/react";
 import { toast } from "sonner";
 import { OutputViewer } from "@/components/ui/output-viewer";
 import Inbox from "./inbox";
-import History from "./editor/history";
+import History from "./history";
 import { useGlobalHotkeys } from "@/hooks/use-hotkeys";
 import { createSigner } from "@permaweb/aoconnect";
 
@@ -107,7 +107,7 @@ function switchFileType(activeFile: string): React.JSX.Element {
 }
 
 export default function Editor() {
-    const { activeProject, activeFile, openedFiles, output, actions } = useGlobalState();
+    const { activeProject, activeFile, openedFiles, output, actions, bottomPanelOpen } = useGlobalState();
     const { projects } = useProjects();
     const { theme } = useTheme();
     const settings = useSettings();
@@ -190,26 +190,6 @@ export default function Editor() {
         toggleTerminal: handleToggleTerminal
     });
 
-    // Debug: Add a temporary keydown listener to see what keys are being pressed
-    useEffect(() => {
-        // const debugKeyHandler = (event: KeyboardEvent) => {
-        //     // Only log when Ctrl is pressed to reduce noise
-        //     if (event.ctrlKey || event.metaKey) {
-        //         console.log('Key pressed:', {
-        //             key: event.key,
-        //             code: event.code,
-        //             ctrlKey: event.ctrlKey,
-        //             metaKey: event.metaKey,
-        //             altKey: event.altKey,
-        //             shiftKey: event.shiftKey
-        //         });
-        //     }
-        // };
-
-        // document.addEventListener('keydown', debugKeyHandler);
-        // return () => document.removeEventListener('keydown', debugKeyHandler);
-    }, []);
-
     // Horizontal scroll handler for file tabs
     useEffect(() => {
         const container = fileTabsContainerRef.current;
@@ -246,6 +226,16 @@ export default function Editor() {
         window.addEventListener('beforeunload', handleBeforeUnload);
         return () => window.removeEventListener('beforeunload', handleBeforeUnload);
     }, [openedFiles, project]);
+
+    useEffect(() => {
+        if (bottomPanelRef.current) {
+            if (bottomPanelOpen) {
+                bottomPanelRef.current.expand();
+            } else {
+                bottomPanelRef.current.collapse();
+            }
+        }
+    }, [bottomPanelRef, bottomPanelOpen])
 
     async function runLuaFile() {
         if (!activeFile || !project || !file) return;
@@ -385,8 +375,8 @@ export default function Editor() {
 
             <ResizableHandle />
 
-            <ResizablePanel defaultSize={20} minSize={5} collapsible className="relative" ref={bottomPanelRef}>
-                {/* BOTTOM PANEL WITH TABS */}
+            {/* BOTTOM PANEL WITH TABS */}
+            <ResizablePanel defaultSize={20} minSize={5} collapsible className="relative" ref={bottomPanelRef} onCollapse={() => actions.setBottomPanelOpen(false)} onExpand={() => actions.setBottomPanelOpen(true)}>
                 <div className="h-full">
                     <Tabs className="h-full relative gap-0" defaultValue="terminal">
                         <TabsList className="h-[25px] border-b rounded-none w-full justify-center items-center overflow-clip bg-transparent p-0">
@@ -402,7 +392,6 @@ export default function Editor() {
                             <TabsTrigger value="history" className="h-[25px] rounded-none hover:bg-accent data-[state=active]:!bg-primary data-[state=active]:!text-background transition-all duration-150">
                                 History
                             </TabsTrigger>
-                            <PanelBottomClose strokeWidth={1.5} className="w-7 h-6.5 px-1 cursor-pointer hover:bg-accent transition-all duration-150" onClick={() => bottomPanelRef.current?.collapse()} />
                         </TabsList>
 
                         <TabsContent value="terminal" className="h-[calc(100%-30px)] overflow-hidden m-0 p-0">

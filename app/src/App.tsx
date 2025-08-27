@@ -9,7 +9,7 @@ import Menubar from "./components/menubar";
 import Statusbar from "./components/statusbar";
 import LeftSidebar from "./components/left-sidebar";
 import Drawer from "./components/drawer";
-import Terminal from "./components/terminal";
+import Terminal from "./components/editor/terminal";
 import { useGlobalState } from "./hooks/use-global-state";
 import Settings from "./components/settings";
 import Welcome from "./components/welcome";
