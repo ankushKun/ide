@@ -15,6 +15,7 @@ export interface File {
     cellOrder: string[],                    // list of cell ids in order
     cells: { [key: string]: Cell },         // cell id -> full cell data
     process?: string,
+    processPrompt?: string,
     isMainnet: boolean,
     ownerAddress?: string
 }
@@ -31,6 +32,7 @@ export interface Project {
     name: string,
     files: { [key: string]: File },
     process: string,
+    processPrompt?: string,
     ownerAddress: string,
     isMainnet: boolean,
     interactState?: InteractState
@@ -47,6 +49,9 @@ interface ProjectsActions {
 
     addRecent: (projectId: string) => void
     removeRecent: (projectId: string) => void
+
+    setFileProcessPrompt: (projectId: string, fileName: string, prompt: string) => void
+    setProjectProcessPrompt: (projectId: string, processId: string, prompt: string) => void
 }
 
 export interface ProjectsState {
@@ -68,7 +73,10 @@ export const useProjects = create<ProjectsState>()(persist((set) => ({
         setInteractState: (projectId: string, interactState: InteractState) => set((state) => ({ projects: { ...state.projects, [projectId]: { ...state.projects[projectId], interactState } } })),
 
         addRecent: (projectId: string) => set((state) => ({ recents: [projectId, ...state.recents.filter((id) => id !== projectId)] })),
-        removeRecent: (projectId: string) => set((state) => ({ recents: state.recents.filter((id) => id !== projectId) }))
+        removeRecent: (projectId: string) => set((state) => ({ recents: state.recents.filter((id) => id !== projectId) })),
+
+        setFileProcessPrompt: (projectId: string, fileName: string, prompt: string) => set((state) => ({ projects: { ...state.projects, [projectId]: { ...state.projects[projectId], files: { ...state.projects[projectId].files, [fileName]: { ...state.projects[projectId].files[fileName], processPrompt: prompt } } } } })),
+        setProjectProcessPrompt: (projectId: string, processId: string, prompt: string) => set((state) => ({ projects: { ...state.projects, [projectId]: { ...state.projects[projectId], process: processId, processPrompt: prompt } } }))
     }
 }), {
     name: "betteridea-projects",

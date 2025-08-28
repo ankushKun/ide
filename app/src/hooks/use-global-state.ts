@@ -33,6 +33,7 @@ interface GlobalStateActions {
     setOutput: (output: string) => void
     addHistoryEntry: (entry: Omit<HistoryEntry, 'id' | 'timestamp'>) => void
     clearHistory: () => void
+
 }
 
 export interface GlobalState {
@@ -40,6 +41,7 @@ export interface GlobalState {
     activeView: ViewOptions | null
     activeProject: string
     activeFile: string
+
     openedFiles: string[]
     drawerOpen: boolean
     bottomPanelOpen: boolean
@@ -52,6 +54,7 @@ const globalStateStore = create<GlobalState>()(persist((set, get) => ({
     activeDrawer: "files",
     activeView: null,
     activeProject: "",
+
     activeFile: "",
     openedFiles: [],
     drawerOpen: true,
@@ -110,7 +113,8 @@ const globalStateStore = create<GlobalState>()(persist((set, get) => ({
                 timestamp: new Date()
             }, ...state.history]
         })),
-        clearHistory: () => set({ history: [] })
+        clearHistory: () => set({ history: [] }),
+
     }
 }), {
     name: "betteridea-global-state",

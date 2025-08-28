@@ -108,7 +108,7 @@ function switchFileType(activeFile: string): React.JSX.Element {
 
 export default function Editor() {
     const { activeProject, activeFile, openedFiles, output, actions, bottomPanelOpen } = useGlobalState();
-    const { projects } = useProjects();
+    const { projects, actions: projectsActions } = useProjects();
     const { theme } = useTheme();
     const settings = useSettings();
 
@@ -292,7 +292,14 @@ export default function Editor() {
                     processId: file.process || project.process,
                     code: code
                 });
+                const isFileProcess = file.process && file.process !== project.process
                 console.log("result", result)
+                const prompt = result.output.prompt
+                if (isFileProcess) {
+                    projectsActions.setFileProcessPrompt(activeProject, activeFile, prompt)
+                } else {
+                    projectsActions.setProjectProcessPrompt(activeProject, project.process, prompt)
+                }
 
                 const parsedOutput = parseOutput(result);
                 const hasError = isExecutionError(result);

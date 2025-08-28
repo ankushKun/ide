@@ -343,6 +343,13 @@ export const ANSI = {
   BOLD: '\x1b[1m',
   DIM: '\x1b[2m',
 
+  ITALIC: '\x1b[3m',
+  UNDERLINE: '\x1b[4m',
+  BLINK: '\x1b[5m',
+  REVERSE: '\x1b[7m',
+  HIDDEN: '\x1b[8m',
+  STRIKETHROUGH: '\x1b[9m',
+
   // Foreground colors
   BLACK: '\x1b[30m',
   RED: '\x1b[31m',

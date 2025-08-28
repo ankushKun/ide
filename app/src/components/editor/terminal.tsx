@@ -28,12 +28,20 @@ const AOS_ASCII = String.raw`
      \/__/         \/__/         \/__/    
 `
 
+// define window properties
+declare global {
+    interface Window {
+        xtermPrompt: string
+        activeTerminalFile: string
+    }
+}
+
 export default function Terminal() {
     const settings = useSettings()
     const activeProjectId = useGlobalState(s => s.activeProject)
     const project = useProjects(s => s.projects[activeProjectId])
-    const process = useProjects(s => s.projects[activeProjectId]?.process)
-
+    const { actions: globalActions, activeProject } = useGlobalState()
+    const { actions: projectsActions } = useProjects()
     const terminalRef = useRef<HTMLDivElement>(null)
     const xtermRef = useRef<XTerm | null>(null)
     const fitAddonRef = useRef<FitAddon | null>(null)
@@ -41,7 +49,31 @@ export default function Terminal() {
     const resizeObserverRef = useRef<ResizeObserver | null>(null)
     const [isReady, setIsReady] = useState(false)
 
-    const prompt = "lua> " // Simple hardcoded prompt
+    // Initialize window.activeTerminalFile if not set
+    if (typeof window.activeTerminalFile === 'undefined') {
+        window.activeTerminalFile = ""
+    }
+
+    // Function to update the prompt based on current activeTerminalFile
+    const updatePrompt = useCallback(() => {
+        if (!window.activeTerminalFile) {
+            window.xtermPrompt = project?.processPrompt || "no-project-process?> "
+        } else {
+            if (project?.files[window.activeTerminalFile]?.process) {
+                window.xtermPrompt = ANSI.RESET + ANSI.DIM + window.activeTerminalFile + ANSI.RESET + ANSI.DIM + ">" + ANSI.RESET + project?.files[window.activeTerminalFile]?.processPrompt || "no-file-process?> "
+            } else {
+                window.xtermPrompt = ANSI.RESET + ANSI.DIM + window.activeTerminalFile + ANSI.RESET + ANSI.DIM + ">" + ANSI.RESET + project?.processPrompt || "no-project-process?> "
+            }
+        }
+
+        console.log(window.activeTerminalFile, window.xtermPrompt)
+    }, [project])
+
+    // Update prompt when project changes
+    useEffect(() => {
+        updatePrompt()
+    }, [updatePrompt])
+
 
     // Spinner state
     const spinnerIntervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -114,7 +146,7 @@ export default function Terminal() {
 
     // Function to show initial terminal state (ASCII art + connection message)
     const showInitialTerminalState = useCallback(() => {
-        if (!xtermRef.current || !process) return
+        if (!xtermRef.current || !project?.process) return
 
         // Clear terminal first
         xtermRef.current.clear()
@@ -130,11 +162,26 @@ export default function Terminal() {
             }
         })
 
-        let connectionMessage = "\n" + ANSI.RESET + ANSI.DIM + "Connected to process: " + ANSI.RESET + ANSI.LIGHTBLUE + process + ANSI.RESET
+        // Determine which process and file info to show
+        const activeFile = window.activeTerminalFile
+        const isFileProcess = activeFile && project?.files[activeFile]?.process && project?.files[activeFile]?.process !== project?.process
+
+        let connectionMessage = "\n" + ANSI.RESET + ANSI.DIM + "Connected to process: " + ANSI.RESET + ANSI.LIGHTBLUE +
+            (isFileProcess ? project?.files[activeFile]?.process : project?.process) + ANSI.RESET
+
+        // Add file information if there's an active file
+        if (activeFile) {
+            connectionMessage += "\n\r" + ANSI.RESET + ANSI.DIM + "Active file: " + ANSI.RESET + ANSI.YELLOW + activeFile + ANSI.RESET
+            if (isFileProcess) {
+                connectionMessage += ANSI.RESET + ANSI.DIM + " (using file process)" + ANSI.RESET
+            } else {
+                connectionMessage += ANSI.RESET + ANSI.DIM + " (using project process)" + ANSI.RESET
+            }
+        }
 
         xtermRef.current.write(connectionMessage)
         xtermRef.current.write('\n\r\n')
-    }, [process])
+    }, [project?.process, project?.files])
 
     // Helper function to write multi-line content with proper formatting
     const writeMultiLineContent = useCallback((content: string, prefix: string = '', suffix: string = '') => {
@@ -152,27 +199,7 @@ export default function Terminal() {
         xtermRef.current!.write('\r\n')
     }, [])
 
-    // Function to show initial terminal state only
-    const initializeTerminal = useCallback(() => {
-        if (!xtermRef.current || !process) return
 
-        // Show initial state
-        showInitialTerminalState()
-
-        // Show the current prompt in the terminal so user knows where to type
-        xtermRef.current!.write(ANSI.RESET + prompt)
-    }, [process, showInitialTerminalState, prompt])
-
-    // Function to clear terminal to initial state
-    const clearTerminalToInitialState = useCallback(() => {
-        if (!process || !xtermRef.current) return
-
-        // Show initial state
-        showInitialTerminalState()
-
-        // Show the current prompt in the terminal so user knows where to type
-        xtermRef.current.write(ANSI.RESET + prompt)
-    }, [process, showInitialTerminalState, prompt])
 
     // Get theme configuration
     const getThemeConfig = (currentTheme: string) => {
@@ -223,7 +250,17 @@ export default function Terminal() {
             if (domEvent.ctrlKey && (domEvent.key === 'l' || domEvent.key === 'L')) {
                 domEvent.preventDefault()
                 domEvent.stopPropagation()
-                clearTerminalToInitialState()
+
+                if (!project?.process || !xtermRef.current) return false
+
+                // Update prompt first to reflect current active file
+                updatePrompt()
+
+                // Show initial state
+                showInitialTerminalState()
+
+                // Show the current prompt in the terminal so user knows where to type
+                xtermRef.current.write(ANSI.RESET + window.xtermPrompt)
                 return false
             }
         })
@@ -236,7 +273,17 @@ export default function Terminal() {
                 if (terminalContainer && (document.activeElement === terminalContainer || terminalContainer.contains(document.activeElement))) {
                     event.preventDefault()
                     event.stopPropagation()
-                    clearTerminalToInitialState()
+
+                    if (!project?.process || !xtermRef.current) return
+
+                    // Update prompt first to reflect current active file
+                    updatePrompt()
+
+                    // Show initial state
+                    showInitialTerminalState()
+
+                    // Show the current prompt in the terminal so user knows where to type
+                    xtermRef.current.write(ANSI.RESET + window.xtermPrompt)
                 }
             }
         }
@@ -269,7 +316,16 @@ export default function Terminal() {
 
         // Initialize terminal after terminal is ready
         setTimeout(() => {
-            initializeTerminal()
+            if (!xtermRef.current || !project?.process) return
+
+            // Update prompt first to reflect current active file
+            updatePrompt()
+
+            // Show initial state
+            showInitialTerminalState()
+
+            // Show the current prompt in the terminal so user knows where to type
+            xtermRef.current.write(ANSI.RESET + window.xtermPrompt)
         }, 100)
 
         function logOutput(event: Event) {
@@ -286,7 +342,7 @@ export default function Terminal() {
                 readlineRef.current.println(ANSI.RESET + output.trim() + ANSI.RESET)
 
                 // Ensure the prompt is shown after the output
-                xtermRef.current.write(prompt)
+                xtermRef.current.write(window.xtermPrompt)
 
                 // Send response back to the triggering component if eventId is provided
                 if (eventId) {
@@ -317,7 +373,7 @@ export default function Terminal() {
 
             window.removeEventListener("log-output", logOutput)
         }
-    }, [theme, initializeTerminal, clearTerminalToInitialState])
+    }, [theme])
 
     // Fit terminal to container with debouncing
     const fitTerminal = useCallback(() => {
@@ -386,13 +442,13 @@ export default function Terminal() {
         function readLine() {
             if (!readlineRef.current) return
             while (!readlineRef.current.writeReady()) { }
-            if (!process) {
+            if (!project?.process) {
                 readlineRef.current.println("");
                 readlineRef.current.println(ANSI.RESET + ANSI.RED + "[No process found on project]" + ANSI.RESET);
                 readlineRef.current.println(ANSI.RESET + ANSI.RED + "[Go into Settings > Project and set or create a new process]" + ANSI.RESET);
                 return
             }
-            readlineRef.current.read(prompt).then(processLine);
+            readlineRef.current.read(window.xtermPrompt).then(processLine);
         }
 
         async function processLine(text: string) {
@@ -402,15 +458,135 @@ export default function Terminal() {
 
             switch (text.split(" ")[0]) {
                 case "clear":
-                    clearTerminalToInitialState()
+                    if (!project?.process || !xtermRef.current) break
+
+                    // Update prompt first to reflect current active file
+                    updatePrompt()
+
+                    // Show initial state
+                    showInitialTerminalState()
+
+                    // Show the current prompt in the terminal so user knows where to type
+                    xtermRef.current.write(ANSI.RESET + window.xtermPrompt)
+                    break;
+                case "ls": case ".list":
+                    // print files and their processes with index starting from 1
+                    const files = project?.files
+                    if (!files) {
+                        readlineRef.current.println(ANSI.RESET + ANSI.RED + "No files found" + ANSI.RESET)
+                        break;
+                    }
+
+                    const fileEntries = Object.entries(files)
+                    if (fileEntries.length === 0) {
+                        readlineRef.current.println(ANSI.RESET + ANSI.RED + "No files found" + ANSI.RESET)
+                        break;
+                    }
+
+                    // Calculate column widths for proper alignment
+                    const maxIndexWidth = Math.max(1, fileEntries.length.toString().length)
+                    const maxFileWidth = Math.max(4, ...fileEntries.map(([filename]) => filename.length))
+                    // Use full process width but set a reasonable minimum
+                    const maxProcessWidth = Math.max(7, ...fileEntries.map(([, file]) => (file.process || 'none').length))
+
+                    // Create table header - calculate exact width
+                    // Format: │ index │ file │ process │
+                    // Width: 1 + 1 + maxIndexWidth + 1 + 1 + 1 + maxFileWidth + 1 + 1 + 1 + maxProcessWidth + 1 + 1
+                    const totalTableWidth = maxIndexWidth + maxFileWidth + maxProcessWidth + 8
+                    const headerSeparator = "─".repeat(totalTableWidth)
+                    readlineRef.current.println("")
+                    readlineRef.current.println(ANSI.RESET + ANSI.CYAN + "┌" + headerSeparator + "┐" + ANSI.RESET)
+
+                    // Header row
+                    const indexHeader = "#".padStart(maxIndexWidth)
+                    const fileHeader = "File".padEnd(maxFileWidth)
+                    const processHeader = "Process".padEnd(maxProcessWidth)
+                    readlineRef.current.println(ANSI.RESET + ANSI.CYAN + "│ " + ANSI.RESET + ANSI.BOLD + ANSI.WHITE + indexHeader + ANSI.RESET + ANSI.CYAN + " │ " + ANSI.RESET + ANSI.BOLD + ANSI.WHITE + fileHeader + ANSI.RESET + ANSI.CYAN + " │ " + ANSI.RESET + ANSI.BOLD + ANSI.WHITE + processHeader + ANSI.RESET + ANSI.CYAN + " │" + ANSI.RESET)
+
+                    // Header separator
+                    readlineRef.current.println(ANSI.RESET + ANSI.CYAN + "├" + "─".repeat(maxIndexWidth + 2) + "┼" + "─".repeat(maxFileWidth + 2) + "┼" + "─".repeat(maxProcessWidth + 2) + "┤" + ANSI.RESET)
+
+                    // File rows
+                    fileEntries.forEach(([filename, file], index) => {
+                        const isActive = window.activeTerminalFile === filename
+                        const indexStr = (index + 1).toString().padStart(maxIndexWidth)
+                        const filenameStr = filename.padEnd(maxFileWidth)
+                        const processStr = (file.process || 'none').padEnd(maxProcessWidth)
+
+                        // Apply highlighting for active file
+                        if (isActive) {
+                            // Active file - highlighted with green background and bold text
+                            readlineRef.current.println(
+                                ANSI.RESET + ANSI.CYAN + "│ " +
+                                ANSI.RESET + ANSI.BG_GREEN + ANSI.BLACK + ANSI.BOLD + indexStr.slice(0, -1) + "►" + ANSI.RESET +
+                                ANSI.CYAN + " │ " +
+                                ANSI.RESET + ANSI.BG_GREEN + ANSI.BLACK + ANSI.BOLD + filenameStr + ANSI.RESET +
+                                ANSI.CYAN + " │ " +
+                                ANSI.RESET + ANSI.BG_GREEN + ANSI.BLACK + ANSI.BOLD + processStr + ANSI.RESET +
+                                ANSI.CYAN + " │" + ANSI.RESET
+                            )
+                        } else {
+                            // Regular file
+                            readlineRef.current.println(
+                                ANSI.RESET + ANSI.CYAN + "│ " +
+                                ANSI.RESET + ANSI.WHITE + indexStr + ANSI.RESET +
+                                ANSI.CYAN + " │ " +
+                                ANSI.RESET + ANSI.LIGHTCYAN + filenameStr + ANSI.RESET +
+                                ANSI.CYAN + " │ " +
+                                ANSI.RESET + ANSI.DIM + processStr + ANSI.RESET +
+                                ANSI.CYAN + " │" + ANSI.RESET
+                            )
+                        }
+                    })
+
+                    // Table footer
+                    readlineRef.current.println(ANSI.RESET + ANSI.CYAN + "└" + headerSeparator + "┘" + ANSI.RESET)
+                    readlineRef.current.println("")
+
+                    // Instructions
+                    if (window.activeTerminalFile) {
+                        readlineRef.current.println(ANSI.RESET + ANSI.GREEN + "► Currently active: " + ANSI.BOLD + window.activeTerminalFile + ANSI.RESET)
+                    }
+                    readlineRef.current.println(ANSI.RESET + ANSI.DIM + "Use " + ANSI.RESET + ANSI.YELLOW + ".select <index>" + ANSI.RESET + ANSI.DIM + " to switch files or " + ANSI.RESET + ANSI.YELLOW + ".reset" + ANSI.RESET + ANSI.DIM + " to use project process" + ANSI.RESET)
+                    break;
+                case ".select":
+                    // select a file by index
+                    // sets activeTerminalFile to the selected file
+                    // sets prompt to the selected file's process prompt
+                    const selectedFileIndex = parseInt(text.split(" ")[1]) - 1
+                    const selectedFile = Object.keys(project?.files || {})[selectedFileIndex]
+                    console.log(selectedFile)
+                    if (!selectedFile) {
+                        readlineRef.current.println(ANSI.RESET + ANSI.RED + "No file selected" + ANSI.RESET)
+                        break;
+                    }
+                    const file = project?.files[selectedFile]
+                    if (!file) {
+                        readlineRef.current.println(ANSI.RESET + ANSI.RED + "File not found" + ANSI.RESET)
+                        break;
+                    }
+
+                    window.activeTerminalFile = selectedFile
+                    updatePrompt()
+                    break;
+                case ".reset":
+                    window.activeTerminalFile = ""
+                    updatePrompt()
                     break;
                 default:
                     // Start spinner
                     startSpinner();
 
                     try {
-                        const result = await ao.runLua({ processId: process, code: text })
+                        const isFileProcess = project?.files[window.activeTerminalFile]?.process && project?.files[window.activeTerminalFile]?.process !== project?.process
+                        const result = await ao.runLua({ processId: isFileProcess ? project?.files[window.activeTerminalFile]?.process : project?.process, code: text })
                         console.log(result)
+                        console.log(isFileProcess)
+                        if (isFileProcess) {
+                            projectsActions.setFileProcessPrompt(activeProject, window.activeTerminalFile, result.output.prompt)
+                        } else {
+                            projectsActions.setProjectProcessPrompt(activeProject, project?.process, result.output.prompt)
+                        }
 
                         // Stop spinner and clear only the spinner line
                         stopSpinner()
@@ -442,7 +618,7 @@ export default function Terminal() {
 
         readLine()
 
-    }, [isReady, readlineRef, xtermRef, prompt, theme, process, clearTerminalToInitialState, ao, startSpinner, stopSpinner, beautifyErrorOutput])
+    }, [isReady, readlineRef, xtermRef, theme, project?.process, ao, startSpinner, stopSpinner, beautifyErrorOutput, updatePrompt])
 
     return (
         <div className={cn("h-full w-full flex flex-col px-1.5 m-0", theme === "dark" ? "bg-black" : "bg-white")}>
