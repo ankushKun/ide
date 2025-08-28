@@ -437,11 +437,8 @@ export default function Inbox() {
                 <div className="p-2 px-4 border-b border-border space-y-3">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-2 relative">
-                                <InboxIcon className="h-5 w-5" />
-                                <Badge variant="secondary" className="text-xs font-bold absolute top-1/2 -translate-y-1/2 right-1/2 translate-x-1/2 border-none bg-background/80 rounded-none !p-0 !px-0.5 !h-3">
-                                    {inboxEntries.length}
-                                </Badge>
+                            <div className="flex items-center gap-2 relative border-2 h-4 justify-center text-xs rounded border-foreground/70 px-0.5">
+                                {inboxEntries.length}
                             </div>
                             <h1 className="font-semibold">Inbox</h1>
                         </div>

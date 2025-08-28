@@ -41,7 +41,7 @@ export default function Terminal() {
     const settings = useSettings()
     const activeProjectId = useGlobalState(s => s.activeProject)
     const project = useProjects(s => s.projects[activeProjectId])
-    const { actions: globalActions, activeProject, activeFile } = useGlobalState()
+    const { actions: globalActions, activeProject } = useGlobalState()
     const { actions: projectsActions } = useProjects()
     const { addHistoryEntry, getProjectHistory, clearProjectHistory, getQueuedOutputs, clearQueue, setTerminalActive } = useTerminal()
     const terminalRef = useRef<HTMLDivElement>(null)
@@ -77,27 +77,8 @@ export default function Terminal() {
         updatePrompt()
     }, [updatePrompt])
 
-    // Sync terminal active file with global active file when switching tabs
-    useEffect(() => {
-        if (activeFile && project?.files[activeFile]) {
-            // Only sync if the global active file is different from terminal active file
-            // and the global active file exists in the project
-            if (window.activeTerminalFile !== activeFile) {
-                window.activeTerminalFile = activeFile
-                updatePrompt()
-
-                // Update the terminal display to show the new active file context
-                if (xtermRef.current && isReady) {
-                    // Don't clear the terminal, just update the prompt for next input
-                    // The history is preserved, we just change the context for new commands
-                }
-            }
-        } else if (!activeFile && window.activeTerminalFile) {
-            // If no file is active, reset to project-level context
-            window.activeTerminalFile = ""
-            updatePrompt()
-        }
-    }, [activeFile, project?.files, updatePrompt, isReady])
+    // Terminal active file is independent of global active file
+    // It only changes when user explicitly runs terminal commands like .select or .reset
 
 
     // Spinner state
@@ -599,60 +580,41 @@ export default function Terminal() {
                     const maxIndexWidth = Math.max(1, fileEntries.length.toString().length)
                     const maxFileWidth = Math.max(4, ...fileEntries.map(([filename]) => filename.length))
                     // Use full process width but set a reasonable minimum
-                    const maxProcessWidth = Math.max(7, ...fileEntries.map(([, file]) => (file.process || 'none').length))
+                    const maxProcessWidth = Math.max(7, ...fileEntries.map(([, file]) => (file.process || 'default').length))
 
-                    // Create table header - calculate exact width
-                    // Format: │ index │ file │ process │
-                    // Width: 1 + 1 + maxIndexWidth + 1 + 1 + 1 + maxFileWidth + 1 + 1 + 1 + maxProcessWidth + 1 + 1
-                    const totalTableWidth = maxIndexWidth + maxFileWidth + maxProcessWidth + 8
-                    const headerSeparator = "─".repeat(totalTableWidth)
                     readlineRef.current.println("")
-                    readlineRef.current.println(ANSI.RESET + ANSI.CYAN + "┌" + headerSeparator + "┐" + ANSI.RESET)
 
                     // Header row
                     const indexHeader = "#".padStart(maxIndexWidth)
                     const fileHeader = "File".padEnd(maxFileWidth)
                     const processHeader = "Process".padEnd(maxProcessWidth)
-                    readlineRef.current.println(ANSI.RESET + ANSI.CYAN + "│ " + ANSI.RESET + ANSI.BOLD + ANSI.WHITE + indexHeader + ANSI.RESET + ANSI.CYAN + " │ " + ANSI.RESET + ANSI.BOLD + ANSI.WHITE + fileHeader + ANSI.RESET + ANSI.CYAN + " │ " + ANSI.RESET + ANSI.BOLD + ANSI.WHITE + processHeader + ANSI.RESET + ANSI.CYAN + " │" + ANSI.RESET)
-
-                    // Header separator
-                    readlineRef.current.println(ANSI.RESET + ANSI.CYAN + "├" + "─".repeat(maxIndexWidth + 2) + "┼" + "─".repeat(maxFileWidth + 2) + "┼" + "─".repeat(maxProcessWidth + 2) + "┤" + ANSI.RESET)
+                    readlineRef.current.println(ANSI.RESET + ANSI.BOLD + ANSI.UNDERLINE + indexHeader + "  " + fileHeader + "  " + processHeader + ANSI.RESET)
 
                     // File rows
                     fileEntries.forEach(([filename, file], index) => {
                         const isActive = window.activeTerminalFile === filename
                         const indexStr = (index + 1).toString().padStart(maxIndexWidth)
                         const filenameStr = filename.padEnd(maxFileWidth)
-                        const processStr = (file.process || 'none').padEnd(maxProcessWidth)
+                        const processStr = (file.process || 'default').padEnd(maxProcessWidth)
 
                         // Apply highlighting for active file
                         if (isActive) {
-                            // Active file - highlighted with green background and bold text
+                            // Active file - highlighted with light green text
                             readlineRef.current.println(
-                                ANSI.RESET + ANSI.CYAN + "│ " +
-                                ANSI.RESET + ANSI.BG_GREEN + ANSI.BLACK + ANSI.BOLD + indexStr.slice(0, -1) + "►" + ANSI.RESET +
-                                ANSI.CYAN + " │ " +
-                                ANSI.RESET + ANSI.BG_GREEN + ANSI.BLACK + ANSI.BOLD + filenameStr + ANSI.RESET +
-                                ANSI.CYAN + " │ " +
-                                ANSI.RESET + ANSI.BG_GREEN + ANSI.BLACK + ANSI.BOLD + processStr + ANSI.RESET +
-                                ANSI.CYAN + " │" + ANSI.RESET
+                                ANSI.RESET + ANSI.LIGHTGREEN + ANSI.BOLD + indexStr.slice(0, -1) + "►" + "  " +
+                                filenameStr + "  " +
+                                processStr + ANSI.RESET
                             )
                         } else {
-                            // Regular file
+                            // Regular file - default color
                             readlineRef.current.println(
-                                ANSI.RESET + ANSI.CYAN + "│ " +
-                                ANSI.RESET + ANSI.WHITE + indexStr + ANSI.RESET +
-                                ANSI.CYAN + " │ " +
-                                ANSI.RESET + ANSI.LIGHTCYAN + filenameStr + ANSI.RESET +
-                                ANSI.CYAN + " │ " +
-                                ANSI.RESET + ANSI.DIM + processStr + ANSI.RESET +
-                                ANSI.CYAN + " │" + ANSI.RESET
+                                ANSI.RESET + indexStr + "  " +
+                                filenameStr + "  " +
+                                processStr + ANSI.RESET
                             )
                         }
                     })
 
-                    // Table footer
-                    readlineRef.current.println(ANSI.RESET + ANSI.CYAN + "└" + headerSeparator + "┘" + ANSI.RESET)
                     readlineRef.current.println("")
 
                     // Instructions
@@ -665,39 +627,29 @@ export default function Terminal() {
                     if (activeProjectId) {
                         // Capture the entire ls output for history
                         let lsOutput = "\n"
-                        lsOutput += ANSI.RESET + ANSI.CYAN + "┌" + headerSeparator + "┐" + ANSI.RESET + "\n"
-                        lsOutput += ANSI.RESET + ANSI.CYAN + "│ " + ANSI.RESET + ANSI.BOLD + ANSI.WHITE + indexHeader + ANSI.RESET + ANSI.CYAN + " │ " + ANSI.RESET + ANSI.BOLD + ANSI.WHITE + fileHeader + ANSI.RESET + ANSI.CYAN + " │ " + ANSI.RESET + ANSI.BOLD + ANSI.WHITE + processHeader + ANSI.RESET + ANSI.CYAN + " │" + ANSI.RESET + "\n"
-                        lsOutput += ANSI.RESET + ANSI.CYAN + "├" + "─".repeat(maxIndexWidth + 2) + "┼" + "─".repeat(maxFileWidth + 2) + "┼" + "─".repeat(maxProcessWidth + 2) + "┤" + ANSI.RESET + "\n"
+                        lsOutput += ANSI.RESET + ANSI.BOLD + ANSI.UNDERLINE + indexHeader + "  " + fileHeader + "  " + processHeader + ANSI.RESET + "\n"
 
                         fileEntries.forEach(([filename, file], index) => {
                             const isActive = window.activeTerminalFile === filename
                             const indexStr = (index + 1).toString().padStart(maxIndexWidth)
                             const filenameStr = filename.padEnd(maxFileWidth)
-                            const processStr = (file.process || 'none').padEnd(maxProcessWidth)
+                            const processStr = (file.process || 'default').padEnd(maxProcessWidth)
 
                             if (isActive) {
-                                lsOutput += ANSI.RESET + ANSI.CYAN + "│ " +
-                                    ANSI.RESET + ANSI.BG_GREEN + ANSI.BLACK + ANSI.BOLD + indexStr.slice(0, -1) + "►" + ANSI.RESET +
-                                    ANSI.CYAN + " │ " +
-                                    ANSI.RESET + ANSI.BG_GREEN + ANSI.BLACK + ANSI.BOLD + filenameStr + ANSI.RESET +
-                                    ANSI.CYAN + " │ " +
-                                    ANSI.RESET + ANSI.BG_GREEN + ANSI.BLACK + ANSI.BOLD + processStr + ANSI.RESET +
-                                    ANSI.CYAN + " │" + ANSI.RESET + "\n"
+                                lsOutput += ANSI.RESET + ANSI.LIGHTGREEN + ANSI.BOLD + indexStr.slice(0, -1) + "►" + "  " +
+                                    filenameStr + "  " +
+                                    processStr + ANSI.RESET + "\n"
                             } else {
-                                lsOutput += ANSI.RESET + ANSI.CYAN + "│ " +
-                                    ANSI.RESET + ANSI.WHITE + indexStr + ANSI.RESET +
-                                    ANSI.CYAN + " │ " +
-                                    ANSI.RESET + ANSI.LIGHTCYAN + filenameStr + ANSI.RESET +
-                                    ANSI.CYAN + " │ " +
-                                    ANSI.RESET + ANSI.DIM + processStr + ANSI.RESET +
-                                    ANSI.CYAN + " │" + ANSI.RESET + "\n"
+                                lsOutput += ANSI.RESET + indexStr + "  " +
+                                    filenameStr + "  " +
+                                    processStr + ANSI.RESET + "\n"
                             }
                         })
 
-                        lsOutput += ANSI.RESET + ANSI.CYAN + "└" + headerSeparator + "┘" + ANSI.RESET + "\n\n"
+                        lsOutput += "\n"
 
                         if (window.activeTerminalFile) {
-                            lsOutput += ANSI.RESET + ANSI.GREEN + "► Currently active: " + ANSI.BOLD + window.activeTerminalFile + ANSI.RESET + "\n"
+                            lsOutput += ANSI.RESET + ANSI.LIGHTGREEN + "► Currently active: " + ANSI.BOLD + window.activeTerminalFile + ANSI.RESET + "\n"
                         }
                         lsOutput += ANSI.RESET + ANSI.DIM + "Use " + ANSI.RESET + ANSI.YELLOW + ".select <index>" + ANSI.RESET + ANSI.DIM + " to switch files or " + ANSI.RESET + ANSI.YELLOW + ".reset" + ANSI.RESET + ANSI.DIM + " to use project process" + ANSI.RESET
 
