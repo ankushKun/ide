@@ -30,6 +30,7 @@ export default function Settings() {
     const [customCuUrl, setCustomCuUrl] = useState(settings.actions.getCuUrl())
     const [customHbUrl, setCustomHbUrl] = useState(settings.actions.getHbUrl())
     const [customGatewayUrl, setCustomGatewayUrl] = useState(settings.actions.getGatewayUrl())
+    const [customGraphqlUrl, setCustomGraphqlUrl] = useState(settings.actions.getGraphqlUrl())
     const [geminiApiKey, setGeminiApiKey] = useState(() => {
         const key = settings.actions.getGeminiApiKey()
         return key ? "*".repeat(key.length) : ""
@@ -43,10 +44,12 @@ export default function Settings() {
         cu: { latency?: number; success: boolean; error?: string } | null
         hb: { latency?: number; success: boolean; error?: string } | null
         gateway: { latency?: number; success: boolean; error?: string } | null
+        graphql: { latency?: number; success: boolean; error?: string } | null
     }>({
         cu: null,
         hb: null,
-        gateway: null
+        gateway: null,
+        graphql: null
     })
 
     // Process editing state
@@ -84,21 +87,23 @@ export default function Settings() {
     useEffect(() => {
         if (activeTab !== "network") {
             // Reset ping results when leaving network tab
-            setPingResults({ cu: null, hb: null, gateway: null })
+            setPingResults({ cu: null, hb: null, gateway: null, graphql: null })
             return
         }
 
         const pingUrls = async () => {
-            const [cuResult, hbResult, gatewayResult] = await Promise.all([
+            const [cuResult, hbResult, gatewayResult, graphqlResult] = await Promise.all([
                 pingUrl(customCuUrl),
                 pingUrl(customHbUrl),
-                pingUrl(customGatewayUrl)
+                pingUrl(customGatewayUrl),
+                pingUrl(customGraphqlUrl)
             ])
 
             setPingResults({
                 cu: cuResult,
                 hb: hbResult,
-                gateway: gatewayResult
+                gateway: gatewayResult,
+                graphql: graphqlResult
             })
         }
 
@@ -109,25 +114,36 @@ export default function Settings() {
         const interval = setInterval(pingUrls, 3000)
 
         return () => clearInterval(interval)
-    }, [activeTab, customCuUrl, customHbUrl, customGatewayUrl])
+    }, [activeTab, customCuUrl, customHbUrl, customGatewayUrl, customGraphqlUrl])
 
     // Helper function to render ping status
     const renderPingStatus = (result: { latency?: number; success: boolean; error?: string; status?: number } | null) => {
-        console.log(result)
         if (!result) {
             return <span className="text-xs text-muted-foreground font-btr-code">pinging...</span>
         }
 
         if (!result.success) {
-            return <span className="text-xs text-red-500 font-btr-code">error</span>
+            const errorText = result.error || "error"
+            const shortError = errorText.length > 20 ? errorText.substring(0, 20) + "..." : errorText
+            return (
+                <span
+                    className="text-xs text-red-500 font-btr-code cursor-help"
+                    title={result.error || "Unknown error"}
+                >
+                    {shortError}
+                </span>
+            )
         }
 
         const latency = result.latency || 0
         const color = latency < 100 ? 'text-green-500' : latency < 300 ? 'text-yellow-500' : 'text-red-500'
 
-        // Show both latency and HTTP status code for better debugging
+        // Show latency with status code on hover for successful requests
         return (
-            <span className={`text-xs font-btr-code ${color}`}>
+            <span
+                className={`text-xs font-btr-code ${color} cursor-help`}
+                title={result.status ? `HTTP ${result.status} - ${latency}ms` : `${latency}ms`}
+            >
                 {latency}ms
             </span>
         )
@@ -143,7 +159,8 @@ export default function Settings() {
         const urls = [
             { type: "CU", url: customCuUrl },
             { type: "Hyperbeam", url: customHbUrl },
-            { type: "Gateway", url: customGatewayUrl }
+            { type: "Gateway", url: customGatewayUrl },
+            { type: "GraphQL", url: customGraphqlUrl }
         ]
 
         for (const { type, url } of urls) {
@@ -157,6 +174,7 @@ export default function Settings() {
         settings.actions.setCU_URL(customCuUrl)
         settings.actions.setHB_URL(customHbUrl)
         settings.actions.setGATEWAY_URL(customGatewayUrl)
+        settings.actions.setGRAPHQL_URL(customGraphqlUrl)
 
         toast.success("Network settings saved successfully")
 
@@ -166,7 +184,7 @@ export default function Settings() {
         }, 1000) // Small delay to show the success message
     }
 
-    const handleUrlReset = (type: "cu" | "hb" | "gateway") => {
+    const handleUrlReset = (type: "cu" | "hb" | "gateway" | "graphql") => {
         switch (type) {
             case "cu":
                 settings.actions.resetCuUrl()
@@ -180,6 +198,10 @@ export default function Settings() {
                 settings.actions.resetGatewayUrl()
                 setCustomGatewayUrl(settings.actions.getGatewayUrl())
                 break
+            case "graphql":
+                settings.actions.resetGraphqlUrl()
+                setCustomGraphqlUrl(settings.actions.getGraphqlUrl())
+                break
         }
         toast.success(`${type.toUpperCase()} URL reset to default`)
     }
@@ -188,10 +210,12 @@ export default function Settings() {
         settings.actions.resetCuUrl()
         settings.actions.resetHbUrl()
         settings.actions.resetGatewayUrl()
+        settings.actions.resetGraphqlUrl()
 
         setCustomCuUrl(settings.actions.getCuUrl())
         setCustomHbUrl(settings.actions.getHbUrl())
         setCustomGatewayUrl(settings.actions.getGatewayUrl())
+        setCustomGraphqlUrl(settings.actions.getGraphqlUrl())
 
         toast.success("All network settings reset to defaults")
     }
@@ -758,6 +782,30 @@ export default function Settings() {
                                         </div>
                                     </div>
 
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-start gap-2">
+                                            <Label htmlFor="graphql-url" className="text-sm font-medium">GraphQL URL</Label>
+                                            {renderPingStatus(pingResults.graphql)}
+                                        </div>
+                                        <div className="flex space-x-2">
+                                            <Input
+                                                id="graphql-url"
+                                                placeholder="https://arweave-search.goldsky.com/graphql"
+                                                value={customGraphqlUrl}
+                                                onChange={(e) => setCustomGraphqlUrl(e.target.value)}
+                                                className="bg-background/50 border-border/60 text-sm font-btr-code"
+                                            />
+                                            <Button
+                                                onClick={() => handleUrlReset("graphql")}
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-9 px-3"
+                                            >
+                                                <RotateCcw className="h-3 w-3" />
+                                            </Button>
+                                        </div>
+                                    </div>
+
                                     {/* <div className="flex gap-2 pt-2 justify-end">
                                         <Button
                                             onClick={handleSaveAllUrls}
@@ -779,7 +827,7 @@ export default function Settings() {
                                     </div> */}
 
                                     <div className="text-xs text-muted-foreground bg-muted/50 border border-border/40 p-3 rounded-md">
-                                        <strong>Note:</strong> When using custom URLs, it is recommended to use the same providers for CU, Hyperbeam & Gateway for optimal performance. The app will refresh after saving to apply the new settings.
+                                        <strong>Note:</strong> When using custom URLs, it is recommended to use the same providers for CU, Hyperbeam, Gateway & GraphQL for optimal performance. The app will refresh after saving to apply the new settings.
                                     </div>
                                 </CardContent>
                             </Card>

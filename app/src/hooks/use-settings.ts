@@ -7,6 +7,7 @@ export const DEFAULT_SETTINGS = {
     CU_URL: "https://cu.arnode.asia",
     GATEWAY_URL: "https://arweave.net",
     HB_URL: "https://hb.arnode.asia", // Hyperbeam URL
+    GRAPHQL_URL: "https://arweave-search.goldsky.com/graphql", // GraphQL URL
 
     // Editor preferences
     VIM_MODE: false,
@@ -26,6 +27,7 @@ interface SettingsState {
     CU_URL: string;
     GATEWAY_URL: string;
     HB_URL: string;
+    GRAPHQL_URL: string;
 
     // Editor preferences  
     VIM_MODE: boolean;
@@ -45,6 +47,7 @@ interface SettingsActions {
     setCU_URL: (url: string) => void;
     setGATEWAY_URL: (url: string) => void;
     setHB_URL: (url: string) => void;
+    setGRAPHQL_URL: (url: string) => void;
 
     // Editor preference setters
     setVimMode: (enabled: boolean) => void;
@@ -65,6 +68,7 @@ interface SettingsActions {
     resetCuUrl: () => void;
     resetGatewayUrl: () => void;
     resetHbUrl: () => void;
+    resetGraphqlUrl: () => void;
 
     // Validation functions
     isValidUrl: (url: string) => boolean;
@@ -74,6 +78,7 @@ interface SettingsActions {
     getCuUrl: () => string;
     getGatewayUrl: () => string;
     getHbUrl: () => string;
+    getGraphqlUrl: () => string;
     getVimMode: () => boolean;
     getGeminiApiKey: () => string;
     getThemePreference: () => ThemePreference;
@@ -120,6 +125,11 @@ export const useSettings = create<SettingsState>()(
                     set({ HB_URL: url });
                 }
             },
+            setGRAPHQL_URL: (url: string) => {
+                if (isValidUrl(url)) {
+                    set({ GRAPHQL_URL: url });
+                }
+            },
 
             // Editor preference setters
             setVimMode: (enabled: boolean) => {
@@ -148,6 +158,7 @@ export const useSettings = create<SettingsState>()(
                     CU_URL: DEFAULT_SETTINGS.CU_URL,
                     GATEWAY_URL: DEFAULT_SETTINGS.GATEWAY_URL,
                     HB_URL: DEFAULT_SETTINGS.HB_URL,
+                    GRAPHQL_URL: DEFAULT_SETTINGS.GRAPHQL_URL,
                 });
             },
 
@@ -167,6 +178,7 @@ export const useSettings = create<SettingsState>()(
             resetCuUrl: () => set({ CU_URL: DEFAULT_SETTINGS.CU_URL }),
             resetGatewayUrl: () => set({ GATEWAY_URL: DEFAULT_SETTINGS.GATEWAY_URL }),
             resetHbUrl: () => set({ HB_URL: DEFAULT_SETTINGS.HB_URL }),
+            resetGraphqlUrl: () => set({ GRAPHQL_URL: DEFAULT_SETTINGS.GRAPHQL_URL }),
 
             // Validation functions
             isValidUrl,
@@ -176,6 +188,7 @@ export const useSettings = create<SettingsState>()(
             getCuUrl: () => get().CU_URL || DEFAULT_SETTINGS.CU_URL,
             getGatewayUrl: () => get().GATEWAY_URL || DEFAULT_SETTINGS.GATEWAY_URL,
             getHbUrl: () => get().HB_URL || DEFAULT_SETTINGS.HB_URL,
+            getGraphqlUrl: () => get().GRAPHQL_URL || DEFAULT_SETTINGS.GRAPHQL_URL,
             getVimMode: () => get().VIM_MODE ?? DEFAULT_SETTINGS.VIM_MODE,
             getGeminiApiKey: () => get().GEMINI_API_KEY || DEFAULT_SETTINGS.GEMINI_API_KEY,
             getThemePreference: () => get().THEME_PREFERENCE || DEFAULT_SETTINGS.THEME_PREFERENCE,
@@ -187,6 +200,7 @@ export const useSettings = create<SettingsState>()(
                     CU_URL: state.CU_URL,
                     GATEWAY_URL: state.GATEWAY_URL,
                     HB_URL: state.HB_URL,
+                    GRAPHQL_URL: state.GRAPHQL_URL,
                     VIM_MODE: state.VIM_MODE,
                     GEMINI_API_KEY: state.GEMINI_API_KEY,
                     THEME_PREFERENCE: state.THEME_PREFERENCE,
@@ -207,6 +221,7 @@ export const useSettings = create<SettingsState>()(
             CU_URL: state.CU_URL,
             GATEWAY_URL: state.GATEWAY_URL,
             HB_URL: state.HB_URL,
+            GRAPHQL_URL: state.GRAPHQL_URL,
             VIM_MODE: state.VIM_MODE,
             GEMINI_API_KEY: state.GEMINI_API_KEY,
             THEME_PREFERENCE: state.THEME_PREFERENCE,

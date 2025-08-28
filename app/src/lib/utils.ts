@@ -769,3 +769,109 @@ async function imagePing(url: string, startTime: number): Promise<{ success: boo
     img.src = `${urlObj.protocol}//${urlObj.host}/favicon.ico?t=${Date.now()}`;
   });
 }
+
+export async function pingGraphql(url: string = "https://arweave-search.goldsky.com/graphql"): Promise<{ success: boolean, latency: number, status?: number, url: string, error?: string }> {
+  const startTime = performance.now();
+
+  try {
+    // Create an AbortController for timeout handling
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+      },
+      body: JSON.stringify({
+        operationName: null,
+        variables: {},
+        query: `{
+          transactions(ids: "je0Jn1fvHL60HidV2hyh-O-7YLmh4KoWbhqBhG3sNPE") {
+            edges {
+              node {
+                id
+              }
+            }
+          }
+        }`
+      }),
+      signal: controller.signal
+    });
+
+    // Clear the timeout since the request completed
+    clearTimeout(timeoutId);
+
+    const endTime = performance.now();
+    const latency = Math.round(endTime - startTime);
+
+    // Check if the response is ok (status 200-299)
+    if (!response.ok) {
+      return {
+        success: false,
+        latency,
+        status: response.status,
+        url,
+        error: `HTTP ${response.status}: ${response.statusText}`
+      };
+    }
+
+    // Try to parse the response to ensure it's valid GraphQL
+    const data = await response.json();
+
+    // Check if the response has GraphQL errors
+    if (data.errors && data.errors.length > 0) {
+      return {
+        success: false,
+        latency,
+        status: response.status,
+        url,
+        error: `GraphQL Error: ${data.errors[0].message}`
+      };
+    }
+
+    // Check if we got the expected data structure
+    if (!data.data || !data.data.transactions) {
+      return {
+        success: false,
+        latency,
+        status: response.status,
+        url,
+        error: "Invalid GraphQL response structure"
+      };
+    }
+
+    return {
+      success: true,
+      latency,
+      status: response.status,
+      url
+    };
+
+  } catch (error) {
+    const endTime = performance.now();
+    const latency = Math.round(endTime - startTime);
+
+    let errorMessage = "Unknown error";
+
+    if (error instanceof Error) {
+      if (error.name === "AbortError") {
+        errorMessage = "Request timeout (10s)";
+      } else if (error.name === "TypeError" && error.message.includes("fetch")) {
+        errorMessage = "Network error";
+      } else if (error.message.includes("JSON")) {
+        errorMessage = "Invalid JSON response";
+      } else {
+        errorMessage = error.message;
+      }
+    }
+
+    return {
+      success: false,
+      latency,
+      url,
+      error: errorMessage
+    };
+  }
+}
