@@ -5,6 +5,7 @@ import { Badge } from "../ui/badge"
 import { useEffect, useState } from "react"
 import { useGlobalState } from "@/hooks/use-global-state"
 import { useProjects, type File } from "@/hooks/use-projects"
+import { Logger } from "@/lib/utils"
 import { CheckCircle, AlertCircle } from "lucide-react"
 
 interface ValidationError {
@@ -204,7 +205,7 @@ export default function NewFile() {
             }, 1500)
 
         } catch (error) {
-            console.error("Failed to create file:", error)
+            Logger.error('Failed to create file', error)
             setGeneralError(`Failed to create file: ${error instanceof Error ? error.message : 'Unknown error'}`)
         } finally {
             setIsCreating(false)

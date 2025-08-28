@@ -444,3 +444,176 @@ export async function fetchProjectFromProcess({ procesId, HB_URL = "https://hb.a
   const data = await res.json()
   return JSON.parse(data.body)
 }
+
+/**
+ * Beautiful console logging utility with grouped, collapsible, and colored output
+ */
+export class Logger {
+  private static groupStack: string[] = []
+  private static colors = {
+    primary: '#3b82f6',    // blue-500
+    success: '#10b981',    // emerald-500
+    warning: '#f59e0b',    // amber-500
+    error: '#ef4444',      // red-500
+    info: '#6366f1',       // indigo-500
+    debug: '#8b5cf6',      // violet-500
+    input: '#06b6d4',      // cyan-500
+    output: '#84cc16',     // lime-500
+    muted: '#6b7280'       // gray-500
+  }
+
+  private static formatMessage(level: string, message: any, color: string): void {
+    const timestamp = new Date().toLocaleTimeString('en-US', {
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      fractionalSecondDigits: 3
+    })
+
+    const prefix = `%c[${timestamp}] ${level.toUpperCase()}`
+    const styles = `color: ${color}; font-weight: bold; font-family: 'DM Mono', monospace;`
+
+    if (typeof message === 'object' && message !== null) {
+      console.log(prefix, styles, message)
+    } else {
+      console.log(prefix, styles, String(message))
+    }
+  }
+
+  static info(message: any, ...args: any[]): void {
+    this.formatMessage('info', message, this.colors.info)
+    if (args.length > 0) {
+      console.log(...args)
+    }
+  }
+
+  static success(message: any, ...args: any[]): void {
+    this.formatMessage('success', message, this.colors.success)
+    if (args.length > 0) {
+      console.log(...args)
+    }
+  }
+
+  static warning(message: any, ...args: any[]): void {
+    this.formatMessage('warn', message, this.colors.warning)
+    if (args.length > 0) {
+      console.log(...args)
+    }
+  }
+
+  static error(message: any, ...args: any[]): void {
+    this.formatMessage('error', message, this.colors.error)
+    if (args.length > 0) {
+      console.log(...args)
+    }
+  }
+
+  static debug(message: any, ...args: any[]): void {
+    this.formatMessage('debug', message, this.colors.debug)
+    if (args.length > 0) {
+      console.log(...args)
+    }
+  }
+
+  static input(label: string, data: any): void {
+    console.groupCollapsed(
+      `%c📥 INPUT: ${label}`,
+      `color: ${this.colors.input}; font-weight: bold; font-family: 'DM Mono', monospace;`
+    )
+    if (typeof data === 'object' && data !== null) {
+      console.log('%cData:', `color: ${this.colors.muted}; font-weight: bold;`, data)
+    } else {
+      console.log('%cValue:', `color: ${this.colors.muted}; font-weight: bold;`, String(data))
+    }
+    console.groupEnd()
+  }
+
+  static output(label: string, data: any, isError: boolean = false): void {
+    const color = isError ? this.colors.error : this.colors.output
+    const icon = isError ? '❌' : '📤'
+
+    console.groupCollapsed(
+      `%c${icon} OUTPUT: ${label}`,
+      `color: ${color}; font-weight: bold; font-family: 'DM Mono', monospace;`
+    )
+
+    if (isError) {
+      console.log('%cError:', `color: ${this.colors.error}; font-weight: bold;`, data)
+    } else if (typeof data === 'object' && data !== null) {
+      console.log('%cResult:', `color: ${this.colors.muted}; font-weight: bold;`, data)
+    } else {
+      console.log('%cValue:', `color: ${this.colors.muted}; font-weight: bold;`, String(data))
+    }
+    console.groupEnd()
+  }
+
+  static group(label: string, color: string = this.colors.primary): void {
+    this.groupStack.push(label)
+    console.group(
+      `%c🔗 ${label}`,
+      `color: ${color}; font-weight: bold; font-family: 'DM Mono', monospace; font-size: 14px;`
+    )
+  }
+
+  static groupCollapsed(label: string, color: string = this.colors.primary): void {
+    this.groupStack.push(label)
+    console.groupCollapsed(
+      `%c📁 ${label}`,
+      `color: ${color}; font-weight: bold; font-family: 'DM Mono', monospace; font-size: 14px;`
+    )
+  }
+
+  static groupEnd(): void {
+    if (this.groupStack.length > 0) {
+      this.groupStack.pop()
+      console.groupEnd()
+    }
+  }
+
+  static execution(operation: string, input: any, output: any, isError: boolean = false): void {
+    const color = isError ? this.colors.error : this.colors.primary
+    const icon = isError ? '💥' : '⚡'
+
+    this.groupCollapsed(`${icon} ${operation}`, color)
+
+    // Input section
+    console.groupCollapsed(
+      `%c📥 Input`,
+      `color: ${this.colors.input}; font-weight: bold; font-family: 'DM Mono', monospace;`
+    )
+    console.log(input)
+    console.groupEnd()
+
+    // Output section
+    const outputColor = isError ? this.colors.error : this.colors.output
+    const outputIcon = isError ? '❌' : '✅'
+    console.groupCollapsed(
+      `%c${outputIcon} Output`,
+      `color: ${outputColor}; font-weight: bold; font-family: 'DM Mono', monospace;`
+    )
+    console.log(output)
+    console.groupEnd()
+
+    this.groupEnd()
+  }
+
+  static table(label: string, data: any[]): void {
+    this.groupCollapsed(`📊 ${label}`, this.colors.info)
+    console.table(data)
+    this.groupEnd()
+  }
+
+  static time(label: string): void {
+    console.time(`⏱️ ${label}`)
+  }
+
+  static timeEnd(label: string): void {
+    console.timeEnd(`⏱️ ${label}`)
+  }
+
+  static clear(): void {
+    console.clear()
+    this.groupStack = []
+  }
+}

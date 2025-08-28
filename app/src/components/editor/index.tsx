@@ -11,7 +11,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "../ui/tabs";
 import SingleFileEditor from "./single-file-editor";
 import NotebookEditor from "./notebook-editor";
 import { useTheme } from "@/components/theme-provider";
-import { getFileIconElement, parseOutput, stripAnsiCodes, isExecutionError, isErrorText } from "@/lib/utils";
+import { getFileIconElement, parseOutput, stripAnsiCodes, isExecutionError, isErrorText, Logger } from "@/lib/utils";
 import { useSettings } from "@/hooks/use-settings";
 
 import { MainnetAO } from "@/lib/ao";
@@ -270,7 +270,7 @@ export default function Editor() {
 
             // Check if project has a process ID
             if (!project.process && !file.process) {
-                console.log(project, file)
+                Logger.error('No process ID found', { project, file })
                 const message = "Error: No process ID found for this project/file. Please set a process ID in project settings.";
                 actions.setOutput(message);
                 sendToTerminal(message);
@@ -306,7 +306,7 @@ export default function Editor() {
                     code: code
                 });
                 const isFileProcess = file.process && file.process !== project.process
-                console.log("result", result)
+                Logger.execution('Mainnet Code Execution', code, result, isExecutionError(result))
                 const prompt = result.output.prompt
                 if (isFileProcess) {
                     projectsActions.setFileProcessPrompt(activeProject, activeFile, prompt)
@@ -345,7 +345,7 @@ export default function Editor() {
 
         } catch (error) {
             const errorMessage = `Error running Lua code: ${error instanceof Error ? error.message : String(error)}`;
-            console.error(errorMessage);
+            Logger.error('Code execution failed', errorMessage);
             const fullErrorMessage = `Error: ${errorMessage}`;
             actions.setOutput(fullErrorMessage);
             sendToTerminal(fullErrorMessage);

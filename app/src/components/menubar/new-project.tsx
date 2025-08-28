@@ -6,7 +6,7 @@ import { useEffect, useState } from "react"
 import Constants from "@/lib/constants"
 import { useProjects } from "@/hooks/use-projects"
 import { CheckCircle, AlertCircle, X, Plus } from "lucide-react"
-import { validateArweaveId, createNewProject } from "@/lib/utils"
+import { validateArweaveId, createNewProject, Logger } from "@/lib/utils"
 import { MainnetAO } from "@/lib/ao"
 type SimpleTag = { name: string; value: string }
 import { useActiveAddress, useApi } from "@arweave-wallet-kit/react"
@@ -224,14 +224,15 @@ export default function NewProject() {
                     ...customTags
                 ]
 
-                console.log("Spawning process with module:", moduleId)
-                console.log("Tags:", tags)
+                Logger.group('Project Creation')
+                Logger.input('Spawn Process', { moduleId, tags })
                 processId = await ao.spawn({
                     tags,
                     module_: moduleId
                 })
 
-                console.log("Created process:", processId)
+                Logger.success('Process created', processId)
+                Logger.groupEnd()
             }
 
             // Create the project structure
@@ -267,7 +268,7 @@ export default function NewProject() {
             }, 1500)
 
         } catch (error) {
-            console.error("Failed to create project:", error)
+            Logger.error('Failed to create project', error)
             setGeneralError(`Failed to create project: ${error instanceof Error ? error.message : 'Unknown error'}`)
         } finally {
             setIsCreating(false)

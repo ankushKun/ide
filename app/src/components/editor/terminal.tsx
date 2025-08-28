@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { Terminal as XTerm } from '@xterm/xterm'
 import { useTheme } from '../theme-provider'
-import { ANSI, cn, isExecutionError, parseOutput } from '@/lib/utils'
+import { ANSI, cn, isExecutionError, parseOutput, Logger } from '@/lib/utils'
 import { useSettings } from '@/hooks/use-settings'
 import { useProjects } from '@/hooks/use-projects'
 import { useGlobalState } from '@/hooks/use-global-state'
@@ -58,7 +58,7 @@ export default function Terminal() {
 
     // Function to update the prompt based on current activeTerminalFile
     const updatePrompt = useCallback(() => {
-        console.log(window.activeTerminalFile)
+        Logger.debug('Active terminal file', window.activeTerminalFile)
         if (!window.activeTerminalFile) {
             window.xtermPrompt = project?.processPrompt || "no-project-process?> "
         } else {
@@ -399,7 +399,7 @@ export default function Terminal() {
             const output = eventDetail.output
             const eventId = eventDetail.eventId
 
-            console.log(output)
+            Logger.output('Terminal output', output)
             if (xtermRef.current && readlineRef.current) {
                 // Clear the current line before logging output
                 xtermRef.current.write(ANSI.CLEARLINE)
@@ -421,7 +421,7 @@ export default function Terminal() {
 
                 // Send response back to the triggering component if eventId is provided
                 if (eventId) {
-                    console.log("Sending response back to the triggering component")
+                    Logger.info('Sending response back to the triggering component')
                     const responseEvent = new CustomEvent(`terminal-response-${eventId}`);
                     window.dispatchEvent(responseEvent);
                 }
@@ -665,7 +665,7 @@ export default function Terminal() {
                     // sets prompt to the selected file's process prompt
                     const selectedFileIndex = parseInt(text.split(" ")[1]) - 1
                     const selectedFile = Object.keys(project?.files || {})[selectedFileIndex]
-                    console.log(selectedFile)
+                    Logger.debug('Selected file', selectedFile)
                     if (!selectedFile) {
                         readlineRef.current.println(ANSI.RESET + ANSI.RED + "No file selected" + ANSI.RESET)
                         break;
@@ -690,8 +690,8 @@ export default function Terminal() {
                     try {
                         const isFileProcess = project?.files[window.activeTerminalFile]?.process && project?.files[window.activeTerminalFile]?.process !== project?.process
                         const result = await ao.runLua({ processId: isFileProcess ? project?.files[window.activeTerminalFile]?.process : project?.process, code: text })
-                        console.log(result)
-                        console.log(isFileProcess)
+                        Logger.execution('Terminal Lua Execution', text, result, isExecutionError(result))
+                        Logger.debug('Is file process', isFileProcess)
                         if (isFileProcess) {
                             projectsActions.setFileProcessPrompt(activeProject, window.activeTerminalFile, result.output.prompt)
                         } else {

@@ -2,6 +2,7 @@ import { connect } from "@permaweb/aoconnect";
 // import AOCore from "@permaweb/ao-core-libs";
 import Constants from "./constants";
 import { startLiveMonitoring } from "./live-mainnet";
+import { Logger } from "./utils";
 
 export type Tag = {
     name: string,
@@ -130,7 +131,7 @@ export class MainnetAO {
             params.data = data
         }
 
-        console.log(params)
+        Logger.input('Spawn Process', params)
         const res = await this.ao().request(params)
         // const body: ReadableStream = res.body
         // const reader = body.getReader()
@@ -141,12 +142,12 @@ export class MainnetAO {
         //     if (done) break
         //     result += decoder.decode(value, { stream: true })
         // }
-        console.log(res)
+        Logger.output('Spawn Response', res)
 
         const process = (res as any).process
         // const process = await res.headers.get("process")
         // @ts-ignore
-        console.log(process)
+        Logger.info('Process ID', process)
 
         // delay 1s to ensure process is ready
         await new Promise(resolve => setTimeout(resolve, 100))
@@ -159,7 +160,7 @@ export class MainnetAO {
                 gatewayUrl: this.gatewayUrl,
                 intervalMs: 1000,
                 onResult: async (result) => {
-                    console.log(result)
+                    Logger.output('Live Monitoring Result', result)
                     slot() // Stop monitoring
 
                     // send an initial message to activate the process
@@ -168,9 +169,9 @@ export class MainnetAO {
                             processId: process,
                             code: "require('.process')._version"
                         })
-                        console.log("Process initialized:", res2)
+                        Logger.success('Process initialized', res2)
                     } catch (error) {
-                        console.warn("Failed to initialize process:", error)
+                        Logger.warning('Failed to initialize process', error)
                     }
 
                     // Return the process ID
@@ -212,15 +213,15 @@ export class MainnetAO {
         }
 
         const res = await this.ao().request(params)
-        console.log(res)
+        Logger.output('Write Response', res)
         const e = await JSON.parse((res as any).body)
         // const e = await res.json()
-        console.log(e)
+        Logger.output('Parsed Response', e)
         return e
     }
 
     async runLua({ processId, code }: { processId: string, code: string }) {
-        console.log("RUNNING LUA")
+        Logger.execution('Lua Execution', { processId, code }, null)
         const res = await this.write({
             processId,
             tags: [
@@ -228,7 +229,7 @@ export class MainnetAO {
             ],
             data: code
         })
-        console.log(res)
+        Logger.output('Lua Result', res)
         return res
     }
 }
