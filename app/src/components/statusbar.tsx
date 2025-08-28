@@ -3,7 +3,7 @@ import { Button } from "./ui/button";
 import { Database, Wallet, Wallet2, Copy, Unplug, Plug, PartyPopper, Microchip, FileBox, Box } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
-import { cn, stripAnsiCodes } from "@/lib/utils";
+import { ANSI, cn, stripAnsiCodes } from "@/lib/utils";
 import { Link } from "react-router";
 import { ThemeToggleButton } from "./theme-toggle";
 import { useGlobalState } from "@/hooks/use-global-state";
@@ -27,7 +27,7 @@ export default function Statusbar() {
 
     const [mounted, setMounted] = useState(false);
     const [performance, setPerformance] = useState({ memory: 0 });
-    const stopMonitoringRef = useRef<(() => void) | null>(null);
+    const stopMonitoringRef = useRef<Map<string, () => void>>(new Map());
     const api = useApi();
 
     // Get active project and process ID
@@ -36,6 +36,37 @@ export default function Statusbar() {
     const projectProcessId = activeProject?.process;
     const activeProcessId = fileProcessId || projectProcessId;
     const isFileProcess = fileProcessId && fileProcessId !== projectProcessId;
+
+    // Get all unique processes in the project with their associated filenames
+    const getAllProjectProcesses = () => {
+        if (!activeProject) return [];
+
+        const processes: Array<{ processId: string; filename?: string; isMainnet: boolean }> = [];
+
+        // Add project-level process
+        if (projectProcessId) {
+            processes.push({
+                processId: projectProcessId,
+                filename: undefined, // No filename for project-level process
+                isMainnet: activeProject.isMainnet
+            });
+        }
+
+        // Add file-level processes
+        Object.entries(activeProject.files).forEach(([filename, file]) => {
+            if (file.process && file.process !== projectProcessId) {
+                processes.push({
+                    processId: file.process,
+                    filename: filename,
+                    isMainnet: file.isMainnet
+                });
+            }
+        });
+
+        return processes;
+    };
+
+    const allProcesses = getAllProjectProcesses();
 
     // Shorten address or process ID
     const shortenId = (id: string) => {
@@ -46,10 +77,10 @@ export default function Statusbar() {
 
     // Copy process ID to clipboard
     const copyProcessId = async () => {
-        if (!projectProcessId) return;
+        if (!activeProcessId) return;
 
         try {
-            await navigator.clipboard.writeText(projectProcessId);
+            await navigator.clipboard.writeText(activeProcessId);
             toast.success("Process ID copied to clipboard");
         } catch (error) {
             toast.error("Failed to copy process ID");
@@ -80,12 +111,16 @@ export default function Statusbar() {
     }, []);
 
     // Function to send output to terminal with response waiting and queue fallback
-    const sendToTerminal = (output: string) => {
+    const sendToTerminal = (output: string, filename?: string) => {
         if (!projectProcessId) return;
+
+        // Add filename prefix if there are multiple processes and filename is provided
+        const shouldPrefix = allProcesses.length > 1 && filename;
+        const prefixedOutput = shouldPrefix ? `${ANSI.RESET + ANSI.DIM}${filename}>${ANSI.RESET} ${output}` : output;
 
         const terminalEntry = {
             type: 'output' as const,
-            content: output.trim(),
+            content: prefixedOutput.trim(),
             timestamp: Date.now()
         };
 
@@ -97,9 +132,9 @@ export default function Statusbar() {
         const responseTimeout = setTimeout(() => {
             if (!responseReceived) {
                 // Terminal didn't respond, add to queue
-                console.log('Terminal not responding, adding to queue:', output.slice(0, 50));
+                console.log('Terminal not responding, adding to queue:', prefixedOutput.slice(0, 50));
                 terminal.queueOutput({
-                    output: '\r\n' + output,
+                    output: '\r\n' + prefixedOutput,
                     timestamp: Date.now(),
                     eventId: eventId,
                     projectId: globalState.activeProject
@@ -109,7 +144,7 @@ export default function Statusbar() {
                 if (globalState.activeProject) {
                     terminal.addHistoryEntry(globalState.activeProject, {
                         type: 'output',
-                        content: output.trim()
+                        content: prefixedOutput.trim()
                     });
                 }
             }
@@ -129,7 +164,7 @@ export default function Statusbar() {
         // Dispatch custom event to terminal component
         const event = new CustomEvent("log-output", {
             detail: {
-                output: '\r\n' + output,
+                output: '\r\n' + prefixedOutput,
                 eventId: eventId
             }
         });
@@ -137,42 +172,42 @@ export default function Statusbar() {
     };
 
     useEffect(() => {
-        // Stop any existing monitoring
-        if (stopMonitoringRef.current) {
-            stopMonitoringRef.current();
-            stopMonitoringRef.current = null;
-        }
+        // Stop all existing monitoring
+        stopMonitoringRef.current.forEach((stopFn) => stopFn());
+        stopMonitoringRef.current.clear();
 
-        // Start monitoring if we have an active mainnet process
-        if (projectProcessId && activeProject?.isMainnet) {
-            const hbUrl = settings.actions.getHbUrl();
-            const gatewayUrl = settings.actions.getGatewayUrl();
+        // Start monitoring for all mainnet processes
+        allProcesses.forEach((processInfo) => {
+            if (processInfo.isMainnet) {
+                const hbUrl = settings.actions.getHbUrl();
+                const gatewayUrl = settings.actions.getGatewayUrl();
 
-            stopMonitoringRef.current = startLiveMonitoring(projectProcessId, {
-                hbUrl,
-                gatewayUrl,
-                intervalMs: 2000,
-                onResult: (result) => {
-                    // Only send to terminal if there's new data with print output
-                    if (result.hasNewData && result.hasPrint) {
-                        const outputText = result.error || result.output || '';
-                        if (outputText) {
-                            sendToTerminal(outputText);
-                            toast.info(stripAnsiCodes(outputText.slice(0, 200)));
+                const stopFn = startLiveMonitoring(processInfo.processId, {
+                    hbUrl,
+                    gatewayUrl,
+                    intervalMs: 2000,
+                    onResult: (result) => {
+                        // Only send to terminal if there's new data with print output
+                        if (result.hasNewData && result.hasPrint) {
+                            const outputText = result.error || result.output || '';
+                            if (outputText) {
+                                sendToTerminal(outputText, processInfo.filename);
+                                toast.info(stripAnsiCodes(outputText.slice(0, 200)));
+                            }
                         }
                     }
-                }
-            });
-        }
+                });
+
+                stopMonitoringRef.current.set(processInfo.processId, stopFn);
+            }
+        });
 
         // Cleanup function
         return () => {
-            if (stopMonitoringRef.current) {
-                stopMonitoringRef.current();
-                stopMonitoringRef.current = null;
-            }
+            stopMonitoringRef.current.forEach((stopFn) => stopFn());
+            stopMonitoringRef.current.clear();
         };
-    }, [projectProcessId, activeProject?.isMainnet, settings])
+    }, [allProcesses.map(p => `${p.processId}-${p.filename}-${p.isMainnet}`).join(','), settings])
 
     useEffect(() => {
         function syncProjectToProcess() {
