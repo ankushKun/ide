@@ -3,7 +3,7 @@ import { useGlobalState } from "@/hooks/use-global-state"
 import { useProjects } from "@/hooks/use-projects"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel, SelectSeparator } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
@@ -128,35 +128,57 @@ const Interact = memo(function Interact() {
         setLuaCode(luaLines.join('\n'))
     }, [target, action, data, tags, activeProject])
 
-    // Get available processes for selection
-    const getProcessOptions = () => {
-        const options: { label: string; value: string }[] = []
+    // Helper function to get all unique processes from all projects
+    const getAllUniqueProcesses = () => {
+        const processes: { processId: string; fileName: string; projectName: string }[] = []
+        const seenProcesses = new Set<string>()
 
-        // Add current project process
-        if (activeProject?.process) {
-            options.push({
-                label: `${activeProject.name}: ${shortenAddress(activeProject.process)}`,
-                value: activeProject.process
-            })
-        }
-
-        // Add other project processes
-        Object.entries(projectsState.projects).forEach(([name, project]) => {
-            if (project.process && project.process !== activeProject?.process) {
-                options.push({
-                    label: `${name}: ${shortenAddress(project.process)}`,
-                    value: project.process
+        Object.entries(projectsState.projects).forEach(([projectName, project]) => {
+            // Add project-level process if it exists
+            if (project.process && !seenProcesses.has(project.process)) {
+                seenProcesses.add(project.process)
+                processes.push({
+                    processId: project.process,
+                    fileName: "project",
+                    projectName
                 })
             }
+
+            // Add file-level processes for Lua/Luanb files
+            Object.entries(project.files || {}).forEach(([fileName, file]: [string, any]) => {
+                if ((fileName.endsWith('.lua') || fileName.endsWith('.luanb')) &&
+                    file.process &&
+                    !seenProcesses.has(file.process)) {
+                    seenProcesses.add(file.process)
+                    processes.push({
+                        processId: file.process,
+                        fileName,
+                        projectName
+                    })
+                }
+            })
         })
 
-        // Add custom option
-        options.push({
-            label: "Custom Process ID",
-            value: "custom"
+        return processes
+    }
+
+    // Get organized processes for selection
+    const getOrganizedProcesses = () => {
+        const uniqueProcesses = getAllUniqueProcesses()
+
+        // Group processes by project
+        const processByProject: { [projectName: string]: typeof uniqueProcesses } = {}
+        uniqueProcesses.forEach(process => {
+            if (!processByProject[process.projectName]) {
+                processByProject[process.projectName] = []
+            }
+            processByProject[process.projectName].push(process)
         })
 
-        return options
+        return {
+            currentProject: activeProject && processByProject[activeProject.name] ? processByProject[activeProject.name] : [],
+            otherProjects: Object.entries(processByProject).filter(([projectName]) => projectName !== activeProject?.name)
+        }
     }
 
     const addTag = () => {
@@ -282,15 +304,75 @@ const Interact = memo(function Interact() {
                             <label className="text-sm font-medium">Target Process</label>
                             <div className="space-y-2">
                                 <Select value={selectedProcess} onValueChange={setSelectedProcess}>
-                                    <SelectTrigger className="w-full">
+                                    <SelectTrigger className="w-full !h-10">
                                         <SelectValue placeholder="Select target process" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {getProcessOptions().map(option => (
-                                            <SelectItem key={option.value} value={option.value}>
-                                                <span className="truncate">{option.label}</span>
-                                            </SelectItem>
-                                        ))}
+                                        {(() => {
+                                            const { currentProject, otherProjects } = getOrganizedProcesses()
+
+                                            return (
+                                                <>
+                                                    {/* Current Project Processes */}
+                                                    {currentProject.length > 0 && (
+                                                        <SelectGroup>
+                                                            <SelectLabel>Current Project</SelectLabel>
+                                                            {currentProject.map(process => {
+                                                                const isProjectLevel = process.fileName === "project"
+                                                                const label = isProjectLevel
+                                                                    ? `${process.projectName} (Project)`
+                                                                    : `${process.fileName}`
+
+                                                                return (
+                                                                    <SelectItem key={process.processId} value={process.processId}>
+                                                                        <div className="flex flex-col items-start">
+                                                                            <span className="truncate font-medium">{label}</span>
+                                                                            <span className="text-xs text-muted-foreground font-mono">
+                                                                                {shortenAddress(process.processId)}
+                                                                            </span>
+                                                                        </div>
+                                                                    </SelectItem>
+                                                                )
+                                                            })}
+                                                        </SelectGroup>
+                                                    )}
+
+                                                    {/* Other Projects */}
+                                                    {otherProjects.length > 0 && currentProject.length > 0 && <SelectSeparator />}
+                                                    {otherProjects.map(([projectName, processes]) => (
+                                                        <SelectGroup key={projectName}>
+                                                            <SelectLabel>{projectName}</SelectLabel>
+                                                            {processes.map(process => {
+                                                                const isProjectLevel = process.fileName === "project"
+                                                                const label = isProjectLevel
+                                                                    ? "Project Process"
+                                                                    : process.fileName
+
+                                                                return (
+                                                                    <SelectItem key={process.processId} value={process.processId}>
+                                                                        <div className="flex flex-col items-start">
+                                                                            <span className="truncate font-medium">{label}</span>
+                                                                            <span className="text-xs text-muted-foreground font-mono">
+                                                                                {shortenAddress(process.processId)}
+                                                                            </span>
+                                                                        </div>
+                                                                    </SelectItem>
+                                                                )
+                                                            })}
+                                                        </SelectGroup>
+                                                    ))}
+
+                                                    {/* Custom Option */}
+                                                    {(currentProject.length > 0 || otherProjects.length > 0) && <SelectSeparator />}
+                                                    <SelectGroup>
+                                                        <SelectLabel>Custom</SelectLabel>
+                                                        <SelectItem value="custom">
+                                                            <span className="font-medium">Custom Process ID</span>
+                                                        </SelectItem>
+                                                    </SelectGroup>
+                                                </>
+                                            )
+                                        })()}
                                     </SelectContent>
                                 </Select>
                                 {selectedProcess === "custom" && (
