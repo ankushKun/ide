@@ -617,3 +617,155 @@ export class Logger {
     this.groupStack = []
   }
 }
+
+
+export async function pingUrl(url: string, timeoutMs: number = 5000) {
+  try {
+    // Validate URL format
+    if (!url || typeof url !== 'string') {
+      throw new Error('Invalid URL provided');
+    }
+
+    const startTime = performance.now();
+
+    // Create AbortController for timeout handling
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      // First try with manual redirect handling to capture 302 responses
+      const response = await fetch(url, {
+        method: 'HEAD', // HEAD request is lighter than GET
+        cache: 'no-cache',
+        mode: 'cors',
+        redirect: 'manual', // Don't follow redirects automatically
+        signal: controller.signal,
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
+
+      clearTimeout(timeoutId);
+      const endTime = performance.now();
+      const latency = Math.round(endTime - startTime);
+
+      // Only treat 5xx server errors as failures
+      if (response.status >= 500) {
+        throw new Error(`Server error: ${response.status}`);
+      }
+
+      // All other responses (2xx, 3xx, 4xx) are considered successful pings
+      // This includes 302 redirects which we explicitly want to capture
+      return {
+        success: true,
+        latency,
+        status: response.status,
+        url
+      };
+
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+
+      // Handle specific error types
+      if (fetchError.name === 'AbortError') {
+        throw new Error(`Request timeout after ${timeoutMs}ms`);
+      }
+
+      // If it's a server error we threw, re-throw it
+      if (fetchError.message.includes('Server error:')) {
+        throw fetchError;
+      }
+
+      // Log the error for debugging
+      console.log(`Ping error for ${url}:`, fetchError.message, fetchError);
+
+      // For any fetch error that might be CORS-related, try fallback methods
+      // This includes CORS errors, network errors, and generic fetch failures
+      try {
+        const noCorsResponse = await fetch(url, {
+          method: 'HEAD',
+          mode: 'no-cors',
+          cache: 'no-cache',
+          redirect: 'manual',
+          signal: controller.signal,
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        });
+
+        const endTime = performance.now();
+        const latency = Math.round(endTime - startTime);
+
+        return {
+          success: true,
+          latency,
+          status: 0, // Status will be 0 in no-cors mode
+          url
+        };
+      } catch (noCorsError) {
+        console.log(`No-cors also failed for ${url}:`, noCorsError.message);
+        // If no-cors also fails, try image ping as final fallback
+        try {
+          return await imagePing(url, startTime);
+        } catch (imagePingError) {
+          console.log(`Image ping also failed for ${url}:`, imagePingError);
+          // If all methods fail, it's a true network error
+          throw fetchError;
+        }
+      }
+
+      // Network-level errors (DNS, connection refused, etc.) are true failures
+      throw fetchError;
+    }
+
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      url
+    };
+  }
+}
+
+// Fallback ping method using image loading (works around CORS)
+async function imagePing(url: string, startTime: number): Promise<{ success: boolean, latency: number, status?: number, url: string }> {
+  return new Promise<{ success: boolean, latency: number, status?: number, url: string }>((resolve) => {
+    const img = document.createElement('img');
+
+    const cleanup = () => {
+      img.onload = null;
+      img.onerror = null;
+    };
+
+    img.onload = () => {
+      cleanup();
+      const endTime = performance.now();
+      const latency = Math.round(endTime - startTime);
+      resolve({
+        success: true,
+        latency,
+        status: 200, // Assume 200 if image loads
+        url
+      });
+    };
+
+    img.onerror = () => {
+      cleanup();
+      const endTime = performance.now();
+      const latency = Math.round(endTime - startTime);
+      // Even if image fails to load, we got a response (server is reachable)
+      resolve({
+        success: true,
+        latency,
+        status: 404, // Assume 404 if image fails but server responds
+        url
+      });
+    };
+
+    // Try to load a favicon or small resource from the domain
+    const urlObj = new URL(url);
+    img.src = `${urlObj.protocol}//${urlObj.host}/favicon.ico?t=${Date.now()}`;
+  });
+}

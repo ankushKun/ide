@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { ArrowLeft, Moon, Sun, Save, RotateCcw, Settings as SettingsIcon, Edit3, Check, X, Plus, Tag as TagIcon, ChevronDown, ChevronRight, FileText } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,7 +13,7 @@ import { useGlobalState } from "@/hooks/use-global-state"
 import { useProjects } from "@/hooks/use-projects"
 import { useSettings } from "@/hooks/use-settings"
 import { toast } from "sonner"
-import { cn, validateArweaveId } from "@/lib/utils"
+import { cn, validateArweaveId, pingUrl } from "@/lib/utils"
 import { MainnetAO } from "@/lib/ao"
 import Constants from "@/lib/constants"
 import { useActiveAddress, useApi } from "@arweave-wallet-kit/react"
@@ -33,6 +33,20 @@ export default function Settings() {
     const [geminiApiKey, setGeminiApiKey] = useState(() => {
         const key = settings.actions.getGeminiApiKey()
         return key ? "*".repeat(key.length) : ""
+    })
+
+    // Tab state
+    const [activeTab, setActiveTab] = useState("general")
+
+    // Ping state
+    const [pingResults, setPingResults] = useState<{
+        cu: { latency?: number; success: boolean; error?: string } | null
+        hb: { latency?: number; success: boolean; error?: string } | null
+        gateway: { latency?: number; success: boolean; error?: string } | null
+    }>({
+        cu: null,
+        hb: null,
+        gateway: null
     })
 
     // Process editing state
@@ -65,6 +79,59 @@ export default function Settings() {
     const filteredFiles = activeProject ? Object.values(activeProject.files).filter(file =>
         file.name.endsWith('.lua') || file.name.endsWith('.luanb')
     ) : []
+
+    // Ping URLs every second when network tab is active
+    useEffect(() => {
+        if (activeTab !== "network") {
+            // Reset ping results when leaving network tab
+            setPingResults({ cu: null, hb: null, gateway: null })
+            return
+        }
+
+        const pingUrls = async () => {
+            const [cuResult, hbResult, gatewayResult] = await Promise.all([
+                pingUrl(customCuUrl),
+                pingUrl(customHbUrl),
+                pingUrl(customGatewayUrl)
+            ])
+
+            setPingResults({
+                cu: cuResult,
+                hb: hbResult,
+                gateway: gatewayResult
+            })
+        }
+
+        // Initial ping
+        pingUrls()
+
+        // Set up interval for continuous pinging
+        const interval = setInterval(pingUrls, 3000)
+
+        return () => clearInterval(interval)
+    }, [activeTab, customCuUrl, customHbUrl, customGatewayUrl])
+
+    // Helper function to render ping status
+    const renderPingStatus = (result: { latency?: number; success: boolean; error?: string; status?: number } | null) => {
+        console.log(result)
+        if (!result) {
+            return <span className="text-xs text-muted-foreground font-btr-code">pinging...</span>
+        }
+
+        if (!result.success) {
+            return <span className="text-xs text-red-500 font-btr-code">error</span>
+        }
+
+        const latency = result.latency || 0
+        const color = latency < 100 ? 'text-green-500' : latency < 300 ? 'text-yellow-500' : 'text-red-500'
+
+        // Show both latency and HTTP status code for better debugging
+        return (
+            <span className={`text-xs font-btr-code ${color}`}>
+                {latency}ms
+            </span>
+        )
+    }
 
     const handleVimModeChange = (enabled: boolean) => {
         settings.actions.setVimMode(enabled)
@@ -487,7 +554,7 @@ export default function Settings() {
             <div className="flex-1 overflow-auto">
                 <div className="max-w-4xl mx-auto p-6 space-y-6">
 
-                    <Tabs defaultValue="general" className="w-full">
+                    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                         <TabsList className="grid w-full grid-cols-4 items-center justify-center bg-muted/30">
                             <TabsTrigger
                                 value="general"
@@ -620,7 +687,10 @@ export default function Settings() {
 
                                 <CardContent className="space-y-5">
                                     <div className="space-y-2">
-                                        <Label htmlFor="cu-url" className="text-sm font-medium">CU URL</Label>
+                                        <div className="flex items-center justify-start gap-2">
+                                            <Label htmlFor="cu-url" className="text-sm font-medium">CU URL</Label>
+                                            {renderPingStatus(pingResults.cu)}
+                                        </div>
                                         <div className="flex space-x-2">
                                             <Input
                                                 id="cu-url"
@@ -641,7 +711,10 @@ export default function Settings() {
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label htmlFor="hb-url" className="text-sm font-medium">Hyperbeam URL</Label>
+                                        <div className="flex items-center justify-start gap-2">
+                                            <Label htmlFor="hb-url" className="text-sm font-medium">Hyperbeam URL</Label>
+                                            {renderPingStatus(pingResults.hb)}
+                                        </div>
                                         <div className="flex space-x-2">
                                             <Input
                                                 id="hb-url"
@@ -662,7 +735,10 @@ export default function Settings() {
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label htmlFor="gateway-url" className="text-sm font-medium">Gateway URL</Label>
+                                        <div className="flex items-center justify-start gap-2">
+                                            <Label htmlFor="gateway-url" className="text-sm font-medium">Gateway URL</Label>
+                                            {renderPingStatus(pingResults.gateway)}
+                                        </div>
                                         <div className="flex space-x-2">
                                             <Input
                                                 id="gateway-url"
