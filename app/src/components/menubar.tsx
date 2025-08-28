@@ -54,6 +54,7 @@ import { useSettings } from "@/hooks/use-settings"
 import { useActiveAddress } from "@arweave-wallet-kit/react"
 import PanelBottom from "@/assets/icons/panel-bottom"
 import PanelLeft from "@/assets/icons/panel-left"
+import { Button } from "./ui/button"
 
 const link = [
     {
@@ -663,6 +664,10 @@ export default function Menubar() {
                     </MenubarItem>
                 </MenubarContent>
             </MenubarMenu>
+
+            <Button variant="ghost" className="h-[24px] px-2 py-0 rounded-none text-xs font-medium text-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+                onClick={handleSettings}
+            >Settings</Button>
 
 
             {/* Help Menu - Documentation and support */}

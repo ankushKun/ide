@@ -60,14 +60,16 @@ export default function Terminal() {
     const updatePrompt = useCallback(() => {
         Logger.debug('Active terminal file', window.activeTerminalFile)
         if (!window.activeTerminalFile) {
-            window.xtermPrompt = project?.processPrompt || "no-project-process?> "
+            window.xtermPrompt = project?.processPrompt || "aos> "
         } else {
             if (project?.files[window.activeTerminalFile]?.process) {
-                window.xtermPrompt = ANSI.RESET + ANSI.DIM + window.activeTerminalFile + ANSI.RESET + ANSI.DIM + ">" + ANSI.RESET + project?.files[window.activeTerminalFile]?.processPrompt || "no-file-process?> "
+                window.xtermPrompt = ANSI.RESET + ANSI.DIM + window.activeTerminalFile + ANSI.RESET + ANSI.DIM + ">" + ANSI.RESET + project?.files[window.activeTerminalFile]?.processPrompt || "aos> "
             } else {
-                window.xtermPrompt = ANSI.RESET + ANSI.DIM + window.activeTerminalFile + ANSI.RESET + ANSI.DIM + ">" + ANSI.RESET + project?.processPrompt || "no-project-process?> "
+                window.xtermPrompt = ANSI.RESET + ANSI.DIM + window.activeTerminalFile + ANSI.RESET + ANSI.DIM + ">" + ANSI.RESET + project?.processPrompt || "aos> "
             }
         }
+
+        window.xtermPrompt = window.xtermPrompt.replace("undefined", "aos> ")
 
         // console.log(window.activeTerminalFile, window.xtermPrompt)
     }, [project])
@@ -180,8 +182,8 @@ export default function Terminal() {
                 case 'command':
                     // Show the command with prompt
                     const promptToUse = entry.activeFile && project?.files[entry.activeFile]?.process
-                        ? ANSI.RESET + ANSI.DIM + entry.activeFile + ANSI.RESET + ANSI.DIM + ">" + ANSI.RESET + (project?.files[entry.activeFile]?.processPrompt || "no-file-process?> ")
-                        : project?.processPrompt || "no-project-process?> "
+                        ? ANSI.RESET + ANSI.DIM + entry.activeFile + ANSI.RESET + ANSI.DIM + ">" + ANSI.RESET + (project?.files[entry.activeFile]?.processPrompt || "aos> ")
+                        : project?.processPrompt || "aos> "
                     xtermRef.current!.write(promptToUse + entry.content + '\r\n')
                     break
                 case 'output':
@@ -621,7 +623,7 @@ export default function Terminal() {
                     if (window.activeTerminalFile) {
                         readlineRef.current.println(ANSI.RESET + ANSI.GREEN + "► Currently active: " + ANSI.BOLD + window.activeTerminalFile + ANSI.RESET)
                     }
-                    readlineRef.current.println(ANSI.RESET + ANSI.DIM + "Use " + ANSI.RESET + ANSI.YELLOW + ".select <index>" + ANSI.RESET + ANSI.DIM + " to switch files or " + ANSI.RESET + ANSI.YELLOW + ".reset" + ANSI.RESET + ANSI.DIM + " to use project process" + ANSI.RESET)
+                    readlineRef.current.println(ANSI.RESET + ANSI.DIM + "Use " + ANSI.RESET + ANSI.YELLOW + ".select <index|filename>" + ANSI.RESET + ANSI.DIM + " to switch files or " + ANSI.RESET + ANSI.YELLOW + ".reset" + ANSI.RESET + ANSI.DIM + " to use project process" + ANSI.RESET)
 
                     // Save ls output to history
                     if (activeProjectId) {
@@ -651,7 +653,7 @@ export default function Terminal() {
                         if (window.activeTerminalFile) {
                             lsOutput += ANSI.RESET + ANSI.LIGHTGREEN + "► Currently active: " + ANSI.BOLD + window.activeTerminalFile + ANSI.RESET + "\n"
                         }
-                        lsOutput += ANSI.RESET + ANSI.DIM + "Use " + ANSI.RESET + ANSI.YELLOW + ".select <index>" + ANSI.RESET + ANSI.DIM + " to switch files or " + ANSI.RESET + ANSI.YELLOW + ".reset" + ANSI.RESET + ANSI.DIM + " to use project process" + ANSI.RESET
+                        lsOutput += ANSI.RESET + ANSI.DIM + "Use " + ANSI.RESET + ANSI.YELLOW + ".select <index|filename>" + ANSI.RESET + ANSI.DIM + " to switch files or " + ANSI.RESET + ANSI.YELLOW + ".reset" + ANSI.RESET + ANSI.DIM + " to use project process" + ANSI.RESET
 
                         addHistoryEntry(activeProjectId, {
                             type: 'system',
@@ -660,16 +662,38 @@ export default function Terminal() {
                     }
                     break;
                 case ".select":
-                    // select a file by index
+                    // select a file by index or filename
                     // sets activeTerminalFile to the selected file
                     // sets prompt to the selected file's process prompt
-                    const selectedFileIndex = parseInt(text.split(" ")[1]) - 1
-                    const selectedFile = Object.keys(project?.files || {})[selectedFileIndex]
-                    Logger.debug('Selected file', selectedFile)
-                    if (!selectedFile) {
-                        readlineRef.current.println(ANSI.RESET + ANSI.RED + "No file selected" + ANSI.RESET)
+                    const selectArg = text.split(" ")[1]
+                    if (!selectArg) {
+                        readlineRef.current.println(ANSI.RESET + ANSI.RED + "Usage: .select <index|filename>" + ANSI.RESET)
                         break;
                     }
+
+                    let selectedFile: string | undefined
+
+                    // Check if the argument is a number (index)
+                    const parsedIndex = parseInt(selectArg)
+                    if (!isNaN(parsedIndex) && parsedIndex > 0) {
+                        // Select by index (1-based)
+                        const selectedFileIndex = parsedIndex - 1
+                        selectedFile = Object.keys(project?.files || {})[selectedFileIndex]
+                        Logger.debug('Selected file by index', selectedFile)
+                    } else {
+                        // Select by filename
+                        const files = project?.files || {}
+                        if (files[selectArg]) {
+                            selectedFile = selectArg
+                            Logger.debug('Selected file by name', selectedFile)
+                        }
+                    }
+
+                    if (!selectedFile) {
+                        readlineRef.current.println(ANSI.RESET + ANSI.RED + "File not found. Use 'ls' to see available files." + ANSI.RESET)
+                        break;
+                    }
+
                     const file = project?.files[selectedFile]
                     if (!file) {
                         readlineRef.current.println(ANSI.RESET + ANSI.RED + "File not found" + ANSI.RESET)
@@ -678,6 +702,9 @@ export default function Terminal() {
 
                     window.activeTerminalFile = selectedFile
                     updatePrompt()
+
+                    // Show confirmation message
+                    readlineRef.current.println(ANSI.RESET + ANSI.GREEN + "► Selected file: " + ANSI.BOLD + selectedFile + ANSI.RESET)
                     break;
                 case ".reset":
                     window.activeTerminalFile = ""
