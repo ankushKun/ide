@@ -115,7 +115,7 @@ export default function Statusbar() {
             }
             // Clean up listener
             window.removeEventListener(`terminal-response-${eventId}`, responseHandler);
-        }, 1000); // 1 second timeout
+        }, 50); // 50ms second timeout
 
         const responseHandler = () => {
             responseReceived = true;
