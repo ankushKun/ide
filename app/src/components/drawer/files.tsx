@@ -28,6 +28,7 @@ import {
     ContextMenuTrigger,
 } from "../ui/context-menu"
 import { HOTKEYS, getHotkeyDisplay } from "@/lib/hotkeys"
+import { ScrollArea } from "../ui/scroll-area"
 
 
 
@@ -96,7 +97,7 @@ const DrawerFiles = memo(function DrawerFiles() {
             </div>
 
             {/* File list */}
-            <div className="flex-1 overflow-y-auto">
+            <ScrollArea className="flex-1 max-h-[calc(100vh-86px)] overflow-y-auto">
                 {files.length === 0 ? (
                     <div className="p-3 text-center">
                         <div className="text-xs text-muted-foreground mb-2">No files in project</div>
@@ -284,7 +285,7 @@ const DrawerFiles = memo(function DrawerFiles() {
                         })}
                     </div>
                 )}
-            </div>
+            </ScrollArea>
 
 
         </div>

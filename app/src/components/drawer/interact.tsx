@@ -296,7 +296,7 @@ const Interact = memo(function Interact() {
                 </div>
             </div>
 
-            <ScrollArea className="flex-1 max-h-[calc(100vh-86px)]">
+            <ScrollArea className="flex-1 max-h-[calc(100vh-86px)] overflow-y-auto">
                 <div className="p-2.5 space-y-4">
                     {/* Message Form */}
                     <div className="space-y-4">
