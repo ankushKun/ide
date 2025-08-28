@@ -41,9 +41,9 @@ export default function Terminal() {
     const settings = useSettings()
     const activeProjectId = useGlobalState(s => s.activeProject)
     const project = useProjects(s => s.projects[activeProjectId])
-    const { actions: globalActions, activeProject } = useGlobalState()
+    const { actions: globalActions, activeProject, activeFile } = useGlobalState()
     const { actions: projectsActions } = useProjects()
-    const { addHistoryEntry, getProjectHistory, clearProjectHistory } = useTerminal()
+    const { addHistoryEntry, getProjectHistory, clearProjectHistory, getQueuedOutputs, clearQueue, setTerminalActive } = useTerminal()
     const terminalRef = useRef<HTMLDivElement>(null)
     const xtermRef = useRef<XTerm | null>(null)
     const fitAddonRef = useRef<FitAddon | null>(null)
@@ -58,6 +58,7 @@ export default function Terminal() {
 
     // Function to update the prompt based on current activeTerminalFile
     const updatePrompt = useCallback(() => {
+        console.log(window.activeTerminalFile)
         if (!window.activeTerminalFile) {
             window.xtermPrompt = project?.processPrompt || "no-project-process?> "
         } else {
@@ -68,13 +69,35 @@ export default function Terminal() {
             }
         }
 
-        console.log(window.activeTerminalFile, window.xtermPrompt)
+        // console.log(window.activeTerminalFile, window.xtermPrompt)
     }, [project])
 
     // Update prompt when project changes
     useEffect(() => {
         updatePrompt()
     }, [updatePrompt])
+
+    // Sync terminal active file with global active file when switching tabs
+    useEffect(() => {
+        if (activeFile && project?.files[activeFile]) {
+            // Only sync if the global active file is different from terminal active file
+            // and the global active file exists in the project
+            if (window.activeTerminalFile !== activeFile) {
+                window.activeTerminalFile = activeFile
+                updatePrompt()
+
+                // Update the terminal display to show the new active file context
+                if (xtermRef.current && isReady) {
+                    // Don't clear the terminal, just update the prompt for next input
+                    // The history is preserved, we just change the context for new commands
+                }
+            }
+        } else if (!activeFile && window.activeTerminalFile) {
+            // If no file is active, reset to project-level context
+            window.activeTerminalFile = ""
+            updatePrompt()
+        }
+    }, [activeFile, project?.files, updatePrompt, isReady])
 
 
     // Spinner state
@@ -291,11 +314,16 @@ export default function Terminal() {
 
                 if (!project?.process || !xtermRef.current) return false
 
+                // Clear history for this project when user presses Ctrl+L
+                if (activeProjectId) {
+                    clearProjectHistory(activeProjectId)
+                }
+
                 // Update prompt first to reflect current active file
                 updatePrompt()
 
-                // Show initial state
-                showInitialTerminalState()
+                // Show initial state (without history since we just cleared it)
+                showInitialTerminalState(false)
 
                 // Show the current prompt in the terminal so user knows where to type
                 xtermRef.current.write(ANSI.RESET + window.xtermPrompt)
@@ -314,11 +342,16 @@ export default function Terminal() {
 
                     if (!project?.process || !xtermRef.current) return
 
+                    // Clear history for this project when user presses Ctrl+L
+                    if (activeProjectId) {
+                        clearProjectHistory(activeProjectId)
+                    }
+
                     // Update prompt first to reflect current active file
                     updatePrompt()
 
-                    // Show initial state
-                    showInitialTerminalState()
+                    // Show initial state (without history since we just cleared it)
+                    showInitialTerminalState(false)
 
                     // Show the current prompt in the terminal so user knows where to type
                     xtermRef.current.write(ANSI.RESET + window.xtermPrompt)
@@ -356,10 +389,24 @@ export default function Terminal() {
         setTimeout(() => {
             if (!xtermRef.current || !project?.process) return
 
+            // Mark terminal as active
+            setTerminalActive(true)
+
             // Update prompt first to reflect current active file
             updatePrompt()
 
+            // Clear any queued outputs for this project before restoring history
+            // (queued outputs are already saved to history, so we don't need to display them separately)
+            if (activeProjectId) {
+                const queuedOutputs = getQueuedOutputs(activeProjectId)
+                if (queuedOutputs.length > 0) {
+                    console.log(`Clearing ${queuedOutputs.length} queued outputs for project ${activeProjectId} (already in history)`)
+                    clearQueue(activeProjectId)
+                }
+            }
+
             // Show initial state with history restoration
+            // This will display all history including any queued outputs that were saved to history
             showInitialTerminalState(true)
 
             // Show the current prompt in the terminal so user knows where to type
@@ -379,11 +426,21 @@ export default function Terminal() {
                 // Use println to properly handle the output with newlines
                 readlineRef.current.println(ANSI.RESET + output.trim() + ANSI.RESET)
 
+                // Save output to terminal history
+                if (activeProjectId) {
+                    addHistoryEntry(activeProjectId, {
+                        type: 'output',
+                        content: output.trim(),
+                        activeFile: window.activeTerminalFile
+                    });
+                }
+
                 // Ensure the prompt is shown after the output
                 xtermRef.current.write(window.xtermPrompt)
 
                 // Send response back to the triggering component if eventId is provided
                 if (eventId) {
+                    console.log("Sending response back to the triggering component")
                     const responseEvent = new CustomEvent(`terminal-response-${eventId}`);
                     window.dispatchEvent(responseEvent);
                 }
@@ -394,6 +451,9 @@ export default function Terminal() {
 
         // Cleanup
         return () => {
+            // Mark terminal as inactive
+            setTerminalActive(false)
+
             // Clean up spinner
             if (spinnerIntervalRef.current) {
                 clearInterval(spinnerIntervalRef.current)

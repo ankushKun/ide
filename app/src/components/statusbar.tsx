@@ -9,6 +9,7 @@ import { ThemeToggleButton } from "./theme-toggle";
 import { useGlobalState } from "@/hooks/use-global-state";
 import { useProjects } from "@/hooks/use-projects";
 import { useSettings } from "@/hooks/use-settings";
+import { useTerminal } from "@/hooks/use-terminal";
 
 import { startLiveMonitoring } from "@/lib/live-mainnet";
 import { MainnetAO } from "@/lib/ao";
@@ -22,6 +23,7 @@ export default function Statusbar() {
     const globalState = useGlobalState();
     const projects = useProjects();
     const settings = useSettings();
+    const terminal = useTerminal();
 
     const [mounted, setMounted] = useState(false);
     const [performance, setPerformance] = useState({ memory: 0 });
@@ -95,8 +97,21 @@ export default function Statusbar() {
         const responseTimeout = setTimeout(() => {
             if (!responseReceived) {
                 // Terminal didn't respond, add to queue
-                // Terminal no longer has state, just log the output
-                console.log('Terminal not responding, added to queue:', output.slice(0, 50));
+                console.log('Terminal not responding, adding to queue:', output.slice(0, 50));
+                terminal.queueOutput({
+                    output: '\r\n' + output,
+                    timestamp: Date.now(),
+                    eventId: eventId,
+                    projectId: globalState.activeProject
+                });
+
+                // Also add to history so it's preserved
+                if (globalState.activeProject) {
+                    terminal.addHistoryEntry(globalState.activeProject, {
+                        type: 'output',
+                        content: output.trim()
+                    });
+                }
             }
             // Clean up listener
             window.removeEventListener(`terminal-response-${eventId}`, responseHandler);

@@ -24,6 +24,7 @@ import { parseOutput, isExecutionError, isErrorText } from "@/lib/utils";
 import { toast } from "sonner";
 import { OutputViewer } from "@/components/ui/output-viewer";
 import { createSigner } from "@permaweb/aoconnect";
+import { useTerminal } from "@/hooks/use-terminal";
 
 // Use the Cell interface from use-projects.ts
 type NotebookCell = Cell & {
@@ -613,6 +614,7 @@ export default function NotebookEditor() {
     const settings = useSettings();
     const activeAddress = useActiveAddress();
     const api = useApi()
+    const terminal = useTerminal();
     // Global Monaco instances registry for theme updates
     const monacoInstancesRef = useRef<Set<typeof import("monaco-editor")>>(new Set());
 
@@ -670,6 +672,62 @@ export default function NotebookEditor() {
 
     const project = projects[activeProject];
     const file = project?.files[activeFile];
+
+    // Function to send output to terminal with response waiting and queue fallback
+    const sendToTerminal = (output: string) => {
+        const processId = project?.process;
+        if (!processId) return;
+
+        const terminalEntry = {
+            type: 'output' as const,
+            content: output.trim(),
+            timestamp: Date.now()
+        };
+
+        // Create a unique event ID for this request
+        const eventId = `terminal-output-${Date.now()}-${Math.random()}`;
+
+        // Set up response listener
+        let responseReceived = false;
+        const responseTimeout = setTimeout(() => {
+            if (!responseReceived) {
+                // Terminal didn't respond, add to queue
+                console.log('Terminal not responding, adding to queue:', output.slice(0, 50));
+                terminal.queueOutput({
+                    output: '\r\n' + output,
+                    timestamp: Date.now(),
+                    eventId: eventId,
+                    projectId: activeProject
+                });
+
+                // Also save to history immediately to ensure persistence
+                terminal.addHistoryEntry(activeProject, {
+                    type: 'output',
+                    content: output.trim()
+                });
+            }
+            // Clean up listener
+            window.removeEventListener(`terminal-response-${eventId}`, responseHandler);
+        }, 50); // 100ms timeout
+
+        const responseHandler = () => {
+            responseReceived = true;
+            clearTimeout(responseTimeout);
+            window.removeEventListener(`terminal-response-${eventId}`, responseHandler);
+        };
+
+        // Listen for terminal response
+        window.addEventListener(`terminal-response-${eventId}`, responseHandler);
+
+        // Dispatch custom event to terminal component
+        const event = new CustomEvent("log-output", {
+            detail: {
+                output: '\r\n' + output,
+                eventId: eventId
+            }
+        });
+        window.dispatchEvent(event);
+    };
 
     // Convert file structure to notebook cells
     const getCells = (): { [key: string]: NotebookCell } => {
@@ -824,6 +882,9 @@ export default function NotebookEditor() {
                 });
                 // Also update the global output state so it appears in the main editor's output tab
                 globalActions.setOutput(parsedOutput);
+
+                // Send output to terminal
+                sendToTerminal(parsedOutput);
 
                 // Add to history
                 globalActions.addHistoryEntry({

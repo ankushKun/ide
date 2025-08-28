@@ -4,6 +4,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "../ui/resi
 import { type ImperativePanelHandle } from "react-resizable-panels";
 import { useGlobalState } from "@/hooks/use-global-state";
 import { useProjects } from "@/hooks/use-projects";
+import { useTerminal } from "@/hooks/use-terminal";
 import { Button } from "../ui/button";
 import { X, LoaderIcon, Play, PanelTopCloseIcon, PanelBottomClose, PanelTopClose } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../ui/tabs";
@@ -111,6 +112,7 @@ export default function Editor() {
     const { projects, actions: projectsActions } = useProjects();
     const { theme } = useTheme();
     const settings = useSettings();
+    const terminal = useTerminal();
 
     const activeAddress = useActiveAddress();
     const [running, setRunning] = useState(false);
@@ -148,12 +150,23 @@ export default function Editor() {
         const responseTimeout = setTimeout(() => {
             if (!responseReceived) {
                 // Terminal didn't respond, add to queue
-                // Terminal no longer has state, just log the output
-                console.log('Terminal not responding, added to queue:', output.slice(0, 50));
+                console.log('Terminal not responding, adding to queue:', output.slice(0, 50));
+                terminal.queueOutput({
+                    output: '\r\n' + output,
+                    timestamp: Date.now(),
+                    eventId: eventId,
+                    projectId: activeProject
+                });
+
+                // Also save to history immediately to ensure persistence
+                terminal.addHistoryEntry(activeProject, {
+                    type: 'output',
+                    content: output.trim()
+                });
             }
             // Clean up listener
             window.removeEventListener(`terminal-response-${eventId}`, responseHandler);
-        }, 1000); // 1 second timeout
+        }, 100); // 100ms timeout
 
         const responseHandler = () => {
             responseReceived = true;
@@ -306,9 +319,7 @@ export default function Editor() {
                 actions.setOutput(parsedOutput);
 
                 // Send output to terminal
-                if (parsedOutput) {
-                    sendToTerminal(parsedOutput);
-                }
+                sendToTerminal(parsedOutput);
 
                 // Add to history
                 actions.addHistoryEntry({
