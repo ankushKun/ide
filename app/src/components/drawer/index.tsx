@@ -9,6 +9,7 @@ import Packages from "./packages"
 import Sqlite from "./sqlite"
 import Interact from "./interact"
 import Relayer from "./relayer"
+import GraphQL from "./graphql"
 
 export default function Drawer() {
     const drawerOpen = useDrawerOpen()
@@ -90,10 +91,13 @@ export default function Drawer() {
             <div className={activeTab === "relayer" ? "block" : "hidden"}>
                 <Relayer />
             </div>
+            <div className={activeTab === "graphql" ? "block" : "hidden"}>
+                <GraphQL />
+            </div>
             <div className={activeTab === "ao-companion" ? "block" : "hidden"}>
                 <div className="p-4 text-center text-muted-foreground">AO Companion coming soon...</div>
             </div>
-            {!["files", "packages", "sqlite", "interact", "relayer", "ao-companion"].includes(activeTab) && (
+            {!["files", "packages", "sqlite", "interact", "relayer", "graphql", "ao-companion"].includes(activeTab) && (
                 <div className="p-4 text-center text-muted-foreground">Select a tab</div>
             )}
         </div>}

@@ -1,32 +1,32 @@
 import { useGlobalState } from "@/hooks/use-global-state"
 import { usePWAInstall } from "@/hooks/use-pwa-install"
-import { Blocks, Bot, Database, Download, EthernetPort, File, Files, FlaskConical, Settings, TestTubeDiagonal, Waypoints } from "lucide-react"
+import { Blocks, Bot, Database, Download, EthernetPort, File, Files, FlaskConical, Settings, TestTubeDiagonal, VectorSquare, Waypoints } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "./ui/button"
-import { useEffect, useState } from "react"
+import { useEffect, useState, isValidElement } from "react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip"
 
 export interface LeftSidebarOptions {
     label: string
-    Icon: React.ElementType
+    Icon: React.ElementType | React.ReactNode
     id: SidebarTabs
     onClick?: (params: any) => void
     isNew?: boolean
 }
 
-export type SidebarTabs = "files" | "packages" | "sqlite" | "interact" | "relayer" | "ao-companion"
+export type SidebarTabs = "files" | "packages" | "sqlite" | "interact" | "relayer" | "graphql" | "ao-companion"
 
 const options: LeftSidebarOptions[] = [
     {
         label: "Files",
-        Icon: Files,
+        Icon: <Files className="w-4.5 h-4.5" />,
         id: "files",
         onClick: (params: any) => {
         }
     },
     {
         label: "Packages",
-        Icon: Blocks,
+        Icon: <Blocks className="w-4.5 h-4.5" />,
         id: "packages",
         onClick: (params: any) => {
 
@@ -34,7 +34,7 @@ const options: LeftSidebarOptions[] = [
     },
     {
         label: "SQLite Explorer",
-        Icon: Database,
+        Icon: <Database className="w-4.5 h-4.5" />,
         id: "sqlite",
         onClick: (params: any) => {
 
@@ -42,7 +42,7 @@ const options: LeftSidebarOptions[] = [
     },
     {
         label: "Interact",
-        Icon: FlaskConical,
+        Icon: <FlaskConical className="w-4.5 h-4.5" />,
         id: "interact",
         onClick: (params: any) => {
 
@@ -50,8 +50,16 @@ const options: LeftSidebarOptions[] = [
     },
     {
         label: "Relayer",
-        Icon: Waypoints,
+        Icon: <Waypoints className="w-4.5 h-4.5" />,
         id: "relayer",
+        onClick: (params: any) => {
+
+        }
+    },
+    {
+        label: "GraphQL",
+        Icon: <VectorSquare className="w-4.5 h-4.5 rotate-45" />,
+        id: "graphql",
         onClick: (params: any) => {
 
         }
@@ -95,7 +103,7 @@ export default function LeftSidebar() {
                             option.onClick?.({ sidebarActions, activeTab })
                         }}
                     >
-                        {<option.Icon className="w-4.5 h-4.5" />}
+                        {isValidElement(option.Icon) ? option.Icon : <>?</>}
                         {option.isNew && option.id !== activeTab && <span className="text-xxs -bottom-0 bg-primary text-white rounded px-1.5">new</span>}
                     </Button>
                 </TooltipTrigger>
