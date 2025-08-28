@@ -5,6 +5,7 @@ import { ANSI, cn, isExecutionError, parseOutput } from '@/lib/utils'
 import { useSettings } from '@/hooks/use-settings'
 import { useProjects } from '@/hooks/use-projects'
 import { useGlobalState } from '@/hooks/use-global-state'
+import { useTerminal } from '@/hooks/use-terminal'
 
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
@@ -42,6 +43,7 @@ export default function Terminal() {
     const project = useProjects(s => s.projects[activeProjectId])
     const { actions: globalActions, activeProject } = useGlobalState()
     const { actions: projectsActions } = useProjects()
+    const { addHistoryEntry, getProjectHistory, clearProjectHistory } = useTerminal()
     const terminalRef = useRef<HTMLDivElement>(null)
     const xtermRef = useRef<XTerm | null>(null)
     const fitAddonRef = useRef<FitAddon | null>(null)
@@ -88,7 +90,8 @@ export default function Terminal() {
         spinnerIntervalRef.current = setInterval(() => {
             if (xtermRef.current) {
                 const spinnerChar = spinnerChars[spinnerIndexRef.current++ % spinnerChars.length]
-                xtermRef.current.write(ANSI.RESET + ANSI.GREEN + "\r" + spinnerChar + " computing... " + ANSI.RESET)
+                // Clear the entire line first, then write the spinner
+                xtermRef.current.write(ANSI.RESET + "\r" + ANSI.CLEARLINE + ANSI.GREEN + spinnerChar + " computing... " + ANSI.RESET)
             }
         }, 100)
     }, [])
@@ -99,7 +102,8 @@ export default function Terminal() {
             spinnerIntervalRef.current = null
         }
         if (xtermRef.current) {
-            xtermRef.current.write('\r' + ' '.repeat(15) + '\r') // Clear the spinner area
+            // Clear the entire line and return to beginning
+            xtermRef.current.write(ANSI.RESET + "\r" + ANSI.CLEARLINE)
         }
     }, [])
 
@@ -144,8 +148,53 @@ export default function Terminal() {
         return formattedError.trim()
     }, [])
 
+    // Helper function to write multi-line content with proper formatting
+    const writeMultiLineContent = useCallback((content: string, prefix: string = '', suffix: string = '') => {
+        if (!xtermRef.current) return
+
+        const lines = content.split('\n')
+        lines.forEach((line, index) => {
+            xtermRef.current!.write(prefix + line + suffix)
+            // Only add \r\n if we're not on the last line, or if the last line is not empty
+            if (index < lines.length - 1) {
+                xtermRef.current!.write('\r\n')
+            }
+        })
+        // Always add a final \r\n to end the entry
+        xtermRef.current!.write('\r\n')
+    }, [])
+
+    // Function to restore terminal history from state
+    const restoreTerminalHistory = useCallback(() => {
+        if (!xtermRef.current || !activeProjectId) return
+
+        const history = getProjectHistory(activeProjectId)
+
+        // Restore each history entry
+        history.forEach((entry) => {
+            switch (entry.type) {
+                case 'command':
+                    // Show the command with prompt
+                    const promptToUse = entry.activeFile && project?.files[entry.activeFile]?.process
+                        ? ANSI.RESET + ANSI.DIM + entry.activeFile + ANSI.RESET + ANSI.DIM + ">" + ANSI.RESET + (project?.files[entry.activeFile]?.processPrompt || "no-file-process?> ")
+                        : project?.processPrompt || "no-project-process?> "
+                    xtermRef.current!.write(promptToUse + entry.content + '\r\n')
+                    break
+                case 'output':
+                case 'error':
+                    // Show the output/error
+                    writeMultiLineContent(entry.content)
+                    break
+                case 'system':
+                    // Show system messages (like ls output)
+                    writeMultiLineContent(entry.content)
+                    break
+            }
+        })
+    }, [activeProjectId, getProjectHistory, project?.files, project?.processPrompt, writeMultiLineContent])
+
     // Function to show initial terminal state (ASCII art + connection message)
-    const showInitialTerminalState = useCallback(() => {
+    const showInitialTerminalState = useCallback((restoreHistory: boolean = false) => {
         if (!xtermRef.current || !project?.process) return
 
         // Clear terminal first
@@ -181,23 +230,12 @@ export default function Terminal() {
 
         xtermRef.current.write(connectionMessage)
         xtermRef.current.write('\n\r\n')
-    }, [project?.process, project?.files])
 
-    // Helper function to write multi-line content with proper formatting
-    const writeMultiLineContent = useCallback((content: string, prefix: string = '', suffix: string = '') => {
-        if (!xtermRef.current) return
-
-        const lines = content.split('\n')
-        lines.forEach((line, index) => {
-            xtermRef.current!.write(prefix + line + suffix)
-            // Only add \r\n if we're not on the last line, or if the last line is not empty
-            if (index < lines.length - 1) {
-                xtermRef.current!.write('\r\n')
-            }
-        })
-        // Always add a final \r\n to end the entry
-        xtermRef.current!.write('\r\n')
-    }, [])
+        // Restore history if requested
+        if (restoreHistory) {
+            restoreTerminalHistory()
+        }
+    }, [project?.process, project?.files, restoreTerminalHistory])
 
 
 
@@ -321,8 +359,8 @@ export default function Terminal() {
             // Update prompt first to reflect current active file
             updatePrompt()
 
-            // Show initial state
-            showInitialTerminalState()
+            // Show initial state with history restoration
+            showInitialTerminalState(true)
 
             // Show the current prompt in the terminal so user knows where to type
             xtermRef.current.write(ANSI.RESET + window.xtermPrompt)
@@ -456,15 +494,29 @@ export default function Terminal() {
                 return setTimeout(readLine, 100);
             }
 
+            // Save command to history
+            if (activeProjectId) {
+                addHistoryEntry(activeProjectId, {
+                    type: 'command',
+                    content: text,
+                    activeFile: window.activeTerminalFile
+                })
+            }
+
             switch (text.split(" ")[0]) {
                 case "clear":
                     if (!project?.process || !xtermRef.current) break
 
+                    // Clear history for this project when user runs clear
+                    if (activeProjectId) {
+                        clearProjectHistory(activeProjectId)
+                    }
+
                     // Update prompt first to reflect current active file
                     updatePrompt()
 
-                    // Show initial state
-                    showInitialTerminalState()
+                    // Show initial state (without history since we just cleared it)
+                    showInitialTerminalState(false)
 
                     // Show the current prompt in the terminal so user knows where to type
                     xtermRef.current.write(ANSI.RESET + window.xtermPrompt)
@@ -548,6 +600,52 @@ export default function Terminal() {
                         readlineRef.current.println(ANSI.RESET + ANSI.GREEN + "► Currently active: " + ANSI.BOLD + window.activeTerminalFile + ANSI.RESET)
                     }
                     readlineRef.current.println(ANSI.RESET + ANSI.DIM + "Use " + ANSI.RESET + ANSI.YELLOW + ".select <index>" + ANSI.RESET + ANSI.DIM + " to switch files or " + ANSI.RESET + ANSI.YELLOW + ".reset" + ANSI.RESET + ANSI.DIM + " to use project process" + ANSI.RESET)
+
+                    // Save ls output to history
+                    if (activeProjectId) {
+                        // Capture the entire ls output for history
+                        let lsOutput = "\n"
+                        lsOutput += ANSI.RESET + ANSI.CYAN + "┌" + headerSeparator + "┐" + ANSI.RESET + "\n"
+                        lsOutput += ANSI.RESET + ANSI.CYAN + "│ " + ANSI.RESET + ANSI.BOLD + ANSI.WHITE + indexHeader + ANSI.RESET + ANSI.CYAN + " │ " + ANSI.RESET + ANSI.BOLD + ANSI.WHITE + fileHeader + ANSI.RESET + ANSI.CYAN + " │ " + ANSI.RESET + ANSI.BOLD + ANSI.WHITE + processHeader + ANSI.RESET + ANSI.CYAN + " │" + ANSI.RESET + "\n"
+                        lsOutput += ANSI.RESET + ANSI.CYAN + "├" + "─".repeat(maxIndexWidth + 2) + "┼" + "─".repeat(maxFileWidth + 2) + "┼" + "─".repeat(maxProcessWidth + 2) + "┤" + ANSI.RESET + "\n"
+
+                        fileEntries.forEach(([filename, file], index) => {
+                            const isActive = window.activeTerminalFile === filename
+                            const indexStr = (index + 1).toString().padStart(maxIndexWidth)
+                            const filenameStr = filename.padEnd(maxFileWidth)
+                            const processStr = (file.process || 'none').padEnd(maxProcessWidth)
+
+                            if (isActive) {
+                                lsOutput += ANSI.RESET + ANSI.CYAN + "│ " +
+                                    ANSI.RESET + ANSI.BG_GREEN + ANSI.BLACK + ANSI.BOLD + indexStr.slice(0, -1) + "►" + ANSI.RESET +
+                                    ANSI.CYAN + " │ " +
+                                    ANSI.RESET + ANSI.BG_GREEN + ANSI.BLACK + ANSI.BOLD + filenameStr + ANSI.RESET +
+                                    ANSI.CYAN + " │ " +
+                                    ANSI.RESET + ANSI.BG_GREEN + ANSI.BLACK + ANSI.BOLD + processStr + ANSI.RESET +
+                                    ANSI.CYAN + " │" + ANSI.RESET + "\n"
+                            } else {
+                                lsOutput += ANSI.RESET + ANSI.CYAN + "│ " +
+                                    ANSI.RESET + ANSI.WHITE + indexStr + ANSI.RESET +
+                                    ANSI.CYAN + " │ " +
+                                    ANSI.RESET + ANSI.LIGHTCYAN + filenameStr + ANSI.RESET +
+                                    ANSI.CYAN + " │ " +
+                                    ANSI.RESET + ANSI.DIM + processStr + ANSI.RESET +
+                                    ANSI.CYAN + " │" + ANSI.RESET + "\n"
+                            }
+                        })
+
+                        lsOutput += ANSI.RESET + ANSI.CYAN + "└" + headerSeparator + "┘" + ANSI.RESET + "\n\n"
+
+                        if (window.activeTerminalFile) {
+                            lsOutput += ANSI.RESET + ANSI.GREEN + "► Currently active: " + ANSI.BOLD + window.activeTerminalFile + ANSI.RESET + "\n"
+                        }
+                        lsOutput += ANSI.RESET + ANSI.DIM + "Use " + ANSI.RESET + ANSI.YELLOW + ".select <index>" + ANSI.RESET + ANSI.DIM + " to switch files or " + ANSI.RESET + ANSI.YELLOW + ".reset" + ANSI.RESET + ANSI.DIM + " to use project process" + ANSI.RESET
+
+                        addHistoryEntry(activeProjectId, {
+                            type: 'system',
+                            content: lsOutput
+                        })
+                    }
                     break;
                 case ".select":
                     // select a file by index
@@ -600,6 +698,15 @@ export default function Terminal() {
 
                         // Print the output with appropriate styling
                         readlineRef.current.println(displayContent)
+
+                        // Save output to history
+                        if (activeProjectId) {
+                            addHistoryEntry(activeProjectId, {
+                                type: hasError ? 'error' : 'output',
+                                content: displayContent,
+                                activeFile: window.activeTerminalFile
+                            })
+                        }
                     } catch (error) {
                         // Stop spinner and clear only the spinner line
                         stopSpinner()
@@ -610,6 +717,15 @@ export default function Terminal() {
 
                         // Print the error on a new line (command remains visible)
                         readlineRef.current.println(beautifiedCatchError)
+
+                        // Save catch error to history
+                        if (activeProjectId) {
+                            addHistoryEntry(activeProjectId, {
+                                type: 'error',
+                                content: beautifiedCatchError,
+                                activeFile: window.activeTerminalFile
+                            })
+                        }
                     }
             }
 
