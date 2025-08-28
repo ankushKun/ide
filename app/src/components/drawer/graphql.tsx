@@ -73,6 +73,14 @@ const GraphQL = memo(function GraphQL() {
         sort: 'HEIGHT_DESC'
     })
 
+    // Raw input values for comma-separated fields (to preserve user typing)
+    const [rawInputs, setRawInputs] = useState({
+        ids: '',
+        owners: '',
+        recipients: '',
+        bundledIn: ''
+    })
+
     // Query type selection
     const [queryType, setQueryType] = useState<'transactions' | 'transaction'>('transactions')
     const [singleTransactionId, setSingleTransactionId] = useState('')
@@ -93,6 +101,14 @@ const GraphQL = memo(function GraphQL() {
             setFilters({ first: 10, sort: 'HEIGHT_DESC' })
             setSelectedFields({})
         }
+
+        // Clear raw inputs when switching query types
+        setRawInputs({
+            ids: '',
+            owners: '',
+            recipients: '',
+            bundledIn: ''
+        })
     }
 
     // UI state
@@ -114,6 +130,12 @@ const GraphQL = memo(function GraphQL() {
         filters: false,
         advancedFilters: false
     })
+
+    // Helper function to process raw input into array
+    const processRawInput = (rawValue: string): string[] | undefined => {
+        if (!rawValue.trim()) return undefined
+        return rawValue.split(',').map(s => s.trim()).filter(Boolean)
+    }
 
     // Generate GraphQL query from selections
     const generateQuery = useCallback(() => {
@@ -141,9 +163,16 @@ const GraphQL = memo(function GraphQL() {
         const filterArgs: string[] = []
         if (filters.first) filterArgs.push(`first: ${filters.first}`)
         if (filters.after) filterArgs.push(`after: "${filters.after}"`)
-        if (filters.ids?.length) filterArgs.push(`ids: [${filters.ids.map(id => `"${id}"`).join(', ')}]`)
-        if (filters.owners?.length) filterArgs.push(`owners: [${filters.owners.map(owner => `"${owner}"`).join(', ')}]`)
-        if (filters.recipients?.length) filterArgs.push(`recipients: [${filters.recipients.map(recipient => `"${recipient}"`).join(', ')}]`)
+
+        // Process raw inputs for comma-separated fields
+        const processedIds = processRawInput(rawInputs.ids)
+        const processedOwners = processRawInput(rawInputs.owners)
+        const processedRecipients = processRawInput(rawInputs.recipients)
+        const processedBundledIn = processRawInput(rawInputs.bundledIn)
+
+        if (processedIds?.length) filterArgs.push(`ids: [${processedIds.map(id => `"${id}"`).join(', ')}]`)
+        if (processedOwners?.length) filterArgs.push(`owners: [${processedOwners.map(owner => `"${owner}"`).join(', ')}]`)
+        if (processedRecipients?.length) filterArgs.push(`recipients: [${processedRecipients.map(recipient => `"${recipient}"`).join(', ')}]`)
 
         if (filters.tags?.length) {
             const tagFilters = filters.tags.map(tag => {
@@ -156,7 +185,7 @@ const GraphQL = memo(function GraphQL() {
             filterArgs.push(`tags: [${tagFilters}]`)
         }
 
-        if (filters.bundledIn?.length) filterArgs.push(`bundledIn: [${filters.bundledIn.map(id => `"${id}"`).join(', ')}]`)
+        if (processedBundledIn?.length) filterArgs.push(`bundledIn: [${processedBundledIn.map(id => `"${id}"`).join(', ')}]`)
 
         if (filters.ingested_at?.min || filters.ingested_at?.max) {
             const ingestedFilter: string[] = []
@@ -209,7 +238,7 @@ ${fieldsString}
         }
 
         setGeneratedQuery(query)
-    }, [selectedFields, filters, queryType, singleTransactionId])
+    }, [selectedFields, filters, queryType, singleTransactionId, rawInputs])
 
     useEffect(() => {
         generateQuery()
@@ -335,6 +364,12 @@ ${fieldsString}
     const clearAll = () => {
         setSelectedFields({})
         setFilters({ first: 10, sort: 'HEIGHT_DESC' })
+        setRawInputs({
+            ids: '',
+            owners: '',
+            recipients: '',
+            bundledIn: ''
+        })
         setOutput(null)
         handleQueryTypeChange('transactions')
     }
@@ -408,20 +443,21 @@ ${fieldsString}
                                 Single
                             </Badge>
                         </div>
-                        {queryType === 'transaction' && (
-                            <div className="space-y-1">
-                                <Label className="text-xs">Transaction ID</Label>
-                                <Input
-                                    placeholder="Enter transaction ID"
-                                    value={singleTransactionId}
-                                    onChange={(e) => setSingleTransactionId(e.target.value)}
-                                    className="text-xs font-mono"
-                                />
-                            </div>
-                        )}
                     </div>
 
                     <Separator />
+
+                    {queryType === 'transaction' && (
+                        <div className="space-y-1">
+                            <Label className="text-xs">Transaction ID</Label>
+                            <Input
+                                placeholder="Enter transaction ID"
+                                value={singleTransactionId}
+                                onChange={(e) => setSingleTransactionId(e.target.value)}
+                                className="text-xs font-mono"
+                            />
+                        </div>
+                    )}
 
                     {/* Query Filters */}
                     {queryType === 'transactions' && (
@@ -489,10 +525,10 @@ ${fieldsString}
                                             <Label className="text-xs">Transaction IDs</Label>
                                             <Input
                                                 placeholder="id1,id2,id3..."
-                                                value={filters.ids?.join(',') || ""}
-                                                onChange={(e) => setFilters(prev => ({
+                                                value={rawInputs.ids}
+                                                onChange={(e) => setRawInputs(prev => ({
                                                     ...prev,
-                                                    ids: e.target.value ? e.target.value.split(',').map(s => s.trim()).filter(Boolean) : undefined
+                                                    ids: e.target.value
                                                 }))}
                                                 className="text-xs font-mono"
                                             />
@@ -503,10 +539,10 @@ ${fieldsString}
                                             <Label className="text-xs">Owner Addresses</Label>
                                             <Input
                                                 placeholder="address1,address2..."
-                                                value={filters.owners?.join(',') || ""}
-                                                onChange={(e) => setFilters(prev => ({
+                                                value={rawInputs.owners}
+                                                onChange={(e) => setRawInputs(prev => ({
                                                     ...prev,
-                                                    owners: e.target.value ? e.target.value.split(',').map(s => s.trim()).filter(Boolean) : undefined
+                                                    owners: e.target.value
                                                 }))}
                                                 className="text-xs font-mono"
                                             />
@@ -517,10 +553,10 @@ ${fieldsString}
                                             <Label className="text-xs">Recipient Addresses</Label>
                                             <Input
                                                 placeholder="address1,address2..."
-                                                value={filters.recipients?.join(',') || ""}
-                                                onChange={(e) => setFilters(prev => ({
+                                                value={rawInputs.recipients}
+                                                onChange={(e) => setRawInputs(prev => ({
                                                     ...prev,
-                                                    recipients: e.target.value ? e.target.value.split(',').map(s => s.trim()).filter(Boolean) : undefined
+                                                    recipients: e.target.value
                                                 }))}
                                                 className="text-xs font-mono"
                                             />
@@ -531,10 +567,10 @@ ${fieldsString}
                                             <Label className="text-xs">Bundle IDs</Label>
                                             <Input
                                                 placeholder="bundle1,bundle2..."
-                                                value={filters.bundledIn?.join(',') || ""}
-                                                onChange={(e) => setFilters(prev => ({
+                                                value={rawInputs.bundledIn}
+                                                onChange={(e) => setRawInputs(prev => ({
                                                     ...prev,
-                                                    bundledIn: e.target.value ? e.target.value.split(',').map(s => s.trim()).filter(Boolean) : undefined
+                                                    bundledIn: e.target.value
                                                 }))}
                                                 className="text-xs font-mono"
                                             />
@@ -910,10 +946,19 @@ ${fieldsString}
                                     fontFamily: 'var(--font-btr-code)',
                                     margin: 0,
                                     borderRadius: '0.375rem',
+                                    background: 'hsl(var(--muted))',
                                     whiteSpace: 'pre-wrap',
-                                    padding: "8px",
+                                    padding: "0px",
                                     wordBreak: 'break-all',
                                     overflowWrap: 'break-word',
+                                }}
+                                codeTagProps={{
+                                    style: {
+                                        fontFamily: 'var(--font-btr-code)',
+                                        whiteSpace: 'pre-wrap',
+                                        wordBreak: 'break-all',
+                                        overflowWrap: 'break-word',
+                                    }
                                 }}
                             >
                                 {generatedQuery}
