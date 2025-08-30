@@ -226,7 +226,12 @@ export default function Statusbar() {
 
             // set a variable in the process containing the entire projects json
             console.log("SYNC")
-            ao.runLua({ processId: projectProcessId, code: `betteridea = [[${JSON.stringify(project)}]]` })
+            // print collapsed project string
+            console.groupCollapsed()
+            console.log(JSON.stringify(project))
+            console.groupEnd()
+            ao.runLua({ processId: projectProcessId, code: `betteridea = [===[${JSON.stringify(project)}]===]` })
+            console.groupEnd()
         }
 
         const interval = setInterval(syncProjectToProcess, 15000);
