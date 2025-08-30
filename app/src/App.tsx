@@ -75,7 +75,7 @@ export default function App() {
     return `${project.name}/${activeFile} | ${baseTitle}`
   }
 
-  useEffect(() => fixConnection(address, connected, disconnect), [address, connected, disconnect])
+  // useEffect(() => fixConnection(address, connected, disconnect), [address, connected, disconnect])
 
   // Update document title when project, file, or view changes
   useEffect(() => {
