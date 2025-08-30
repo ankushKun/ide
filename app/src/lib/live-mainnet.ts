@@ -28,8 +28,8 @@ export function startLiveMonitoring(
     } = {}
 ): () => void {
     const {
-        hbUrl = "https://hb.betteridea.dev",
-        gatewayUrl = "https://arweave.net",
+        hbUrl = "https://hb.arweave.tech",
+        gatewayUrl = "https://arweave.tech",
         intervalMs = 2000,
         onResult,
         hasShownSlot,

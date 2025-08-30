@@ -6,7 +6,7 @@ import fs from "fs"
 import { startLiveMonitoring } from "@/lib/live-mainnet"
 
 const ar = new Arweave({
-    host: "arweave.net",
+    host: "arweave.tech",
     port: 443,
     protocol: "https",
 })
@@ -17,8 +17,8 @@ console.log("ADDRESS: ", address, "\n\n\n\n")
 
 // const jwk = await ar.wallets.generate()
 
-const hbUrl = "https://hb.arnode.asia"
-const gatewayUrl = "https://arnode.asia"
+const hbUrl = "https://hb.arweave.tech"
+const gatewayUrl = "https://arweave.tech"
 const hb_operator = "CUO_Jtx-J9Ph4NVKY_Bgii4HSUwK3NbdaIlPDSiy8Cs"
 const hb_authority = hb_operator + ',fcoN_xJeisVsPXA-trzVAuIiqO3ydLQxM-L4XbrQKzY'
 const mainnet_module = "xVcnPK8MPmcocS6zwq1eLmM2KhfyarP8zzmz3UVi1g4"

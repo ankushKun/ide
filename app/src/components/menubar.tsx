@@ -88,7 +88,7 @@ const learningResources = [
     {
         title: "LLM Fuel",
         icon: Cannabis,
-        link: "https://fuel_permawebllms.arweave.net/",
+        link: "https://fuel_permawebllms.ar.io/",
     }
 ]
 

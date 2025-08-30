@@ -438,7 +438,7 @@ export function createNewProject(
 }
 
 
-export async function fetchProjectFromProcess({ procesId, HB_URL = "https://hb.arnode.asia" }: { procesId: string, HB_URL: string }) {
+export async function fetchProjectFromProcess({ procesId, HB_URL = "https://hb.arweave.tech" }: { procesId: string, HB_URL: string }) {
   const hashpath = `${HB_URL}/${procesId}/now/betteridea/~json@1.0/serialize`
   const res = await fetch(hashpath)
   const data = await res.json()
@@ -687,7 +687,7 @@ export async function pingUrl(url: string, timeoutMs: number = 5000) {
           method: 'HEAD',
           mode: 'no-cors',
           cache: 'no-cache',
-          redirect: 'manual',
+          redirect: 'follow',
           signal: controller.signal,
           headers: {
             'Cache-Control': 'no-cache',
@@ -770,7 +770,7 @@ async function imagePing(url: string, startTime: number): Promise<{ success: boo
   });
 }
 
-export async function pingGraphql(url: string = "https://arweave-search.goldsky.com/graphql"): Promise<{ success: boolean, latency: number, status?: number, url: string, error?: string }> {
+export async function pingGraphql(url: string = "https://arweave.tech/graphql"): Promise<{ success: boolean, latency: number, status?: number, url: string, error?: string }> {
   const startTime = performance.now();
 
   try {

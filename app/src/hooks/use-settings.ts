@@ -4,10 +4,10 @@ import { persist, createJSONStorage } from "zustand/middleware";
 // Default values for all settings
 export const DEFAULT_SETTINGS = {
     // Network URLs
-    CU_URL: "https://cu.arnode.asia",
-    GATEWAY_URL: "https://arweave.net",
-    HB_URL: "https://hb.arnode.asia", // Hyperbeam URL
-    GRAPHQL_URL: "https://arweave-search.goldsky.com/graphql", // GraphQL URL
+    CU_URL: "https://cu.arweave.tech",
+    GATEWAY_URL: "https://arweave.tech",
+    HB_URL: "https://hb.arweave.tech", // Hyperbeam URL
+    GRAPHQL_URL: "https://arweave.tech/graphql", // GraphQL URL
 
     // Editor preferences
     VIM_MODE: false,

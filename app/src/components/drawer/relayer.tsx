@@ -168,7 +168,7 @@ const Relayer = memo(function Relayer() {
 
     const loadPostExample = () => {
         setRelayMethod("POST")
-        setRelayPath("https://cu.arnode.asia/dry-run?process-id=RLvG3tclmALLBCrwc17NqzNFqZCrUf3-RKZ5v8VRHiU")
+        setRelayPath("https://cu.arweave.tech/dry-run?process-id=RLvG3tclmALLBCrwc17NqzNFqZCrUf3-RKZ5v8VRHiU")
         setResponseActions("Post-Response")
         setRelayBody(JSON.stringify(JSON.parse(`{"Id":"1234","Target":"RLvG3tclmALLBCrwc17NqzNFqZCrUf3-RKZ5v8VRHiU","Owner":"1234","Anchor":"0","Data":"1234","Tags":[{"name":"Action","value":"APM.Popular"},{"name":"Data-Protocol","value":"ao"},{"name":"Type","value":"Message"},{"name":"Variant","value":"http://ao.TN.1"}]}`), null, 2))
     }
