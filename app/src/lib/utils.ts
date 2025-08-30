@@ -779,13 +779,23 @@ export async function pingGraphql(url: string = "https://arweave.tech/graphql"):
     // Use the existing pingUrl function to do a simple ping on the base domain
     const result = await pingUrl(baseDomain, 10000); // 10 second timeout
 
-    return {
-      success: result.success,
-      latency: result.latency || 0,
-      status: result.status,
-      url,
-      error: result.error
-    };
+    if (result.success) {
+      return {
+        success: result.success,
+        latency: 'latency' in result ? result.latency : 0,
+        status: 'status' in result ? result.status : undefined,
+        url,
+        error: undefined
+      };
+    } else {
+      return {
+        success: result.success,
+        latency: 0,
+        status: undefined,
+        url,
+        error: 'error' in result ? result.error : "Unknown error"
+      };
+    }
   } catch (error) {
     return {
       success: false,
