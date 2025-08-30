@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { ArrowLeft, Moon, Sun, Save, RotateCcw, Settings as SettingsIcon, Edit3, Check, X, Plus, Tag as TagIcon, ChevronDown, ChevronRight, FileText } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,7 +13,24 @@ import { useGlobalState } from "@/hooks/use-global-state"
 import { useProjects } from "@/hooks/use-projects"
 import { useSettings } from "@/hooks/use-settings"
 import { toast } from "sonner"
-import { cn, validateArweaveId, pingUrl } from "@/lib/utils"
+import { cn, validateArweaveId, pingUrl, pingGraphql } from "@/lib/utils"
+
+// Custom debounce hook
+function useDebounce<T>(value: T, delay: number): T {
+    const [debouncedValue, setDebouncedValue] = useState<T>(value)
+
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            setDebouncedValue(value)
+        }, delay)
+
+        return () => {
+            clearTimeout(handler)
+        }
+    }, [value, delay])
+
+    return debouncedValue
+}
 import { MainnetAO } from "@/lib/ao"
 import Constants from "@/lib/constants"
 import { useActiveAddress, useApi } from "@arweave-wallet-kit/react"
@@ -35,6 +52,12 @@ export default function Settings() {
         const key = settings.actions.getGeminiApiKey()
         return key ? "*".repeat(key.length) : ""
     })
+
+    // Debounced URL states for pinging (500ms delay)
+    const debouncedCuUrl = useDebounce(customCuUrl, 500)
+    const debouncedHbUrl = useDebounce(customHbUrl, 500)
+    const debouncedGatewayUrl = useDebounce(customGatewayUrl, 500)
+    const debouncedGraphqlUrl = useDebounce(customGraphqlUrl, 500)
 
     // Tab state
     const [activeTab, setActiveTab] = useState("general")
@@ -83,7 +106,7 @@ export default function Settings() {
         file.name.endsWith('.lua') || file.name.endsWith('.luanb')
     ) : []
 
-    // Ping URLs every second when network tab is active
+    // Ping URLs when network tab is active and URLs change (debounced)
     useEffect(() => {
         if (activeTab !== "network") {
             // Reset ping results when leaving network tab
@@ -91,30 +114,43 @@ export default function Settings() {
             return
         }
 
-        const pingUrls = async () => {
-            const [cuResult, hbResult, gatewayResult, graphqlResult] = await Promise.all([
-                pingUrl(customCuUrl),
-                pingUrl(customHbUrl),
-                pingUrl(customGatewayUrl),
-                pingUrl(customGraphqlUrl)
-            ])
+        console.log('Pinging URLs:', {
+            cu: debouncedCuUrl,
+            hb: debouncedHbUrl,
+            gateway: debouncedGatewayUrl,
+            graphql: debouncedGraphqlUrl
+        })
 
-            setPingResults({
-                cu: cuResult,
-                hb: hbResult,
-                gateway: gatewayResult,
-                graphql: graphqlResult
-            })
+        const pingUrls = async () => {
+            try {
+                const [cuResult, hbResult, gatewayResult, graphqlResult] = await Promise.all([
+                    pingUrl(debouncedCuUrl),
+                    pingUrl(debouncedHbUrl),
+                    pingUrl(debouncedGatewayUrl),
+                    pingGraphql(debouncedGraphqlUrl)
+                ])
+
+                console.log('Ping results:', { cuResult, hbResult, gatewayResult, graphqlResult })
+
+                setPingResults({
+                    cu: cuResult,
+                    hb: hbResult,
+                    gateway: gatewayResult,
+                    graphql: graphqlResult
+                })
+            } catch (error) {
+                console.error('Error pinging URLs:', error)
+            }
         }
 
-        // Initial ping
+        // Initial ping with debounced URLs
         pingUrls()
 
-        // Set up interval for continuous pinging
+        // Set up interval for continuous pinging every 3 seconds
         const interval = setInterval(pingUrls, 3000)
 
         return () => clearInterval(interval)
-    }, [activeTab, customCuUrl, customHbUrl, customGatewayUrl, customGraphqlUrl])
+    }, [activeTab, debouncedCuUrl, debouncedHbUrl, debouncedGatewayUrl, debouncedGraphqlUrl])
 
     // Helper function to render ping status
     const renderPingStatus = (result: { latency?: number; success: boolean; error?: string; status?: number } | null) => {
@@ -136,7 +172,7 @@ export default function Settings() {
         }
 
         const latency = result.latency || 0
-        const color = latency < 100 ? 'text-green-500' : latency < 300 ? 'text-yellow-500' : 'text-red-500'
+        const color = latency < 500 ? 'text-green-500' : latency < 1000 ? 'text-yellow-500' : 'text-red-500'
 
         // Show latency with status code on hover for successful requests
         return (
@@ -718,7 +754,7 @@ export default function Settings() {
                                         <div className="flex space-x-2">
                                             <Input
                                                 id="cu-url"
-                                                placeholder="https://cu.arnode.asia"
+                                                placeholder="https://cu.arweave.tech"
                                                 value={customCuUrl}
                                                 onChange={(e) => setCustomCuUrl(e.target.value)}
                                                 className="bg-background/50 border-border/60 text-sm font-btr-code"
@@ -766,7 +802,7 @@ export default function Settings() {
                                         <div className="flex space-x-2">
                                             <Input
                                                 id="gateway-url"
-                                                placeholder="https://arweave.net"
+                                                placeholder="https://arweave.tech"
                                                 value={customGatewayUrl}
                                                 onChange={(e) => setCustomGatewayUrl(e.target.value)}
                                                 className="bg-background/50 border-border/60 text-sm font-btr-code"
@@ -790,7 +826,7 @@ export default function Settings() {
                                         <div className="flex space-x-2">
                                             <Input
                                                 id="graphql-url"
-                                                placeholder="https://arweave-search.goldsky.com/graphql"
+                                                placeholder="https://arweave.tech/graphql"
                                                 value={customGraphqlUrl}
                                                 onChange={(e) => setCustomGraphqlUrl(e.target.value)}
                                                 className="bg-background/50 border-border/60 text-sm font-btr-code"

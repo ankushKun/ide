@@ -438,7 +438,7 @@ export function createNewProject(
 }
 
 
-export async function fetchProjectFromProcess({ procesId, HB_URL = "https://hb.arnode.asia" }: { procesId: string, HB_URL: string }) {
+export async function fetchProjectFromProcess({ procesId, HB_URL = "https://hb.arweave.tech" }: { procesId: string, HB_URL: string }) {
   const hashpath = `${HB_URL}/${procesId}/now/betteridea/~json@1.0/serialize`
   const res = await fetch(hashpath)
   const data = await res.json()
@@ -687,7 +687,7 @@ export async function pingUrl(url: string, timeoutMs: number = 5000) {
           method: 'HEAD',
           mode: 'no-cors',
           cache: 'no-cache',
-          redirect: 'manual',
+          redirect: 'follow',
           signal: controller.signal,
           headers: {
             'Cache-Control': 'no-cache',
@@ -770,108 +770,38 @@ async function imagePing(url: string, startTime: number): Promise<{ success: boo
   });
 }
 
-export async function pingGraphql(url: string = "https://arweave-search.goldsky.com/graphql"): Promise<{ success: boolean, latency: number, status?: number, url: string, error?: string }> {
-  const startTime = performance.now();
-
+export async function pingGraphql(url: string = "https://arweave.tech/graphql"): Promise<{ success: boolean, latency: number, status?: number, url: string, error?: string }> {
   try {
-    // Create an AbortController for timeout handling
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    // Extract base domain from GraphQL URL
+    const urlObj = new URL(url);
+    const baseDomain = `${urlObj.protocol}//${urlObj.host}`;
 
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-      },
-      body: JSON.stringify({
-        operationName: null,
-        variables: {},
-        query: `{
-          transactions(ids: "je0Jn1fvHL60HidV2hyh-O-7YLmh4KoWbhqBhG3sNPE") {
-            edges {
-              node {
-                id
-              }
-            }
-          }
-        }`
-      }),
-      signal: controller.signal
-    });
+    // Use the existing pingUrl function to do a simple ping on the base domain
+    const result = await pingUrl(baseDomain, 10000); // 10 second timeout
 
-    // Clear the timeout since the request completed
-    clearTimeout(timeoutId);
-
-    const endTime = performance.now();
-    const latency = Math.round(endTime - startTime);
-
-    // Check if the response is ok (status 200-299)
-    if (!response.ok) {
+    if (result.success) {
       return {
-        success: false,
-        latency,
-        status: response.status,
+        success: result.success,
+        latency: 'latency' in result ? result.latency : 0,
+        status: 'status' in result ? result.status : undefined,
         url,
-        error: `HTTP ${response.status}: ${response.statusText}`
+        error: undefined
+      };
+    } else {
+      return {
+        success: result.success,
+        latency: 0,
+        status: undefined,
+        url,
+        error: 'error' in result ? result.error : "Unknown error"
       };
     }
-
-    // Try to parse the response to ensure it's valid GraphQL
-    const data = await response.json();
-
-    // Check if the response has GraphQL errors
-    if (data.errors && data.errors.length > 0) {
-      return {
-        success: false,
-        latency,
-        status: response.status,
-        url,
-        error: `GraphQL Error: ${data.errors[0].message}`
-      };
-    }
-
-    // Check if we got the expected data structure
-    if (!data.data || !data.data.transactions) {
-      return {
-        success: false,
-        latency,
-        status: response.status,
-        url,
-        error: "Invalid GraphQL response structure"
-      };
-    }
-
-    return {
-      success: true,
-      latency,
-      status: response.status,
-      url
-    };
-
   } catch (error) {
-    const endTime = performance.now();
-    const latency = Math.round(endTime - startTime);
-
-    let errorMessage = "Unknown error";
-
-    if (error instanceof Error) {
-      if (error.name === "AbortError") {
-        errorMessage = "Request timeout (10s)";
-      } else if (error.name === "TypeError" && error.message.includes("fetch")) {
-        errorMessage = "Network error";
-      } else if (error.message.includes("JSON")) {
-        errorMessage = "Invalid JSON response";
-      } else {
-        errorMessage = error.message;
-      }
-    }
-
     return {
       success: false,
-      latency,
+      latency: 0,
       url,
-      error: errorMessage
+      error: error instanceof Error ? error.message : "Unknown error"
     };
   }
 }
