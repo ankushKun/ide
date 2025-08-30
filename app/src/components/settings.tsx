@@ -172,7 +172,7 @@ export default function Settings() {
         }
 
         const latency = result.latency || 0
-        const color = latency < 100 ? 'text-green-500' : latency < 300 ? 'text-yellow-500' : 'text-red-500'
+        const color = latency < 500 ? 'text-green-500' : latency < 1000 ? 'text-yellow-500' : 'text-red-500'
 
         // Show latency with status code on hover for successful requests
         return (

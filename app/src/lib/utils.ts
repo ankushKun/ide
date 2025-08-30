@@ -771,107 +771,27 @@ async function imagePing(url: string, startTime: number): Promise<{ success: boo
 }
 
 export async function pingGraphql(url: string = "https://arweave.tech/graphql"): Promise<{ success: boolean, latency: number, status?: number, url: string, error?: string }> {
-  const startTime = performance.now();
-
   try {
-    // Create an AbortController for timeout handling
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    // Extract base domain from GraphQL URL
+    const urlObj = new URL(url);
+    const baseDomain = `${urlObj.protocol}//${urlObj.host}`;
 
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-      },
-      body: JSON.stringify({
-        operationName: null,
-        variables: {},
-        query: `{
-          transactions(ids: "je0Jn1fvHL60HidV2hyh-O-7YLmh4KoWbhqBhG3sNPE") {
-            edges {
-              node {
-                id
-              }
-            }
-          }
-        }`
-      }),
-      signal: controller.signal
-    });
-
-    // Clear the timeout since the request completed
-    clearTimeout(timeoutId);
-
-    const endTime = performance.now();
-    const latency = Math.round(endTime - startTime);
-
-    // Check if the response is ok (status 200-299)
-    if (!response.ok) {
-      return {
-        success: false,
-        latency,
-        status: response.status,
-        url,
-        error: `HTTP ${response.status}: ${response.statusText}`
-      };
-    }
-
-    // Try to parse the response to ensure it's valid GraphQL
-    const data = await response.json();
-
-    // Check if the response has GraphQL errors
-    if (data.errors && data.errors.length > 0) {
-      return {
-        success: false,
-        latency,
-        status: response.status,
-        url,
-        error: `GraphQL Error: ${data.errors[0].message}`
-      };
-    }
-
-    // Check if we got the expected data structure
-    if (!data.data || !data.data.transactions) {
-      return {
-        success: false,
-        latency,
-        status: response.status,
-        url,
-        error: "Invalid GraphQL response structure"
-      };
-    }
+    // Use the existing pingUrl function to do a simple ping on the base domain
+    const result = await pingUrl(baseDomain, 10000); // 10 second timeout
 
     return {
-      success: true,
-      latency,
-      status: response.status,
-      url
+      success: result.success,
+      latency: result.latency || 0,
+      status: result.status,
+      url,
+      error: result.error
     };
-
   } catch (error) {
-    const endTime = performance.now();
-    const latency = Math.round(endTime - startTime);
-
-    let errorMessage = "Unknown error";
-
-    if (error instanceof Error) {
-      if (error.name === "AbortError") {
-        errorMessage = "Request timeout (10s)";
-      } else if (error.name === "TypeError" && error.message.includes("fetch")) {
-        errorMessage = "Network error";
-      } else if (error.message.includes("JSON")) {
-        errorMessage = "Invalid JSON response";
-      } else {
-        errorMessage = error.message;
-      }
-    }
-
     return {
       success: false,
-      latency,
+      latency: 0,
       url,
-      error: errorMessage
+      error: error instanceof Error ? error.message : "Unknown error"
     };
   }
 }
