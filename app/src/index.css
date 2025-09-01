@@ -234,6 +234,56 @@
   font-family: var(--font-btr-code) !important;
 }
 
+.monaco-editor,
+.monaco-editor * {
+  border-color: transparent !important;
+  border-width: 0px !important;
+  border-style: hidden !important;
+}
+
+/* Prevent blue border/outline during Monaco initial render */
+.monaco-editor .monaco-editor-background,
+.monaco-editor .inputarea,
+.monaco-editor .view-lines,
+.monaco-editor .overflow-guard,
+.monaco-editor .monaco-scrollable-element,
+.monaco-editor .lines-content,
+.monaco-editor .view-line {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+/* Prevent focus outline on Monaco container */
+.monaco-editor:focus,
+.monaco-editor:focus-within {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+/* Remove any blue selection/focus borders from Monaco */
+.monaco-editor .selected-text,
+.monaco-editor .current-line,
+.monaco-editor .cursor-line,
+.monaco-editor .focused .selected-text,
+.monaco-editor .monaco-list:focus .monaco-list-row.selected,
+.monaco-editor .monaco-list:focus .monaco-list-row.focused,
+.monaco-editor .monaco-list .monaco-list-row.selected,
+.monaco-editor .monaco-list .monaco-list-row.focused {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+/* Remove blue outline from Monaco diff editor */
+.monaco-diff-editor,
+.monaco-diff-editor * {
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: transparent !important;
+}
+
 .monaco-editor .view-lines,
 .monaco-editor .view-line,
 .monaco-editor .line-numbers,

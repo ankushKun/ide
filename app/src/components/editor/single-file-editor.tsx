@@ -13,6 +13,14 @@ const monacoConfig: editor.IStandaloneEditorConstructionOptions = {
     lineHeight: 20,
     lineNumbersMinChars: 3,
     scrollBeyondLastLine: false,
+    automaticLayout: true,
+    renderLineHighlight: 'none',
+    hideCursorInOverviewRuler: true,
+    overviewRulerBorder: false,
+    scrollbar: {
+        vertical: 'hidden',
+        horizontal: 'hidden',
+    },
 }
 
 const diffMonacoConfig: editor.IDiffEditorConstructionOptions = {
@@ -22,6 +30,14 @@ const diffMonacoConfig: editor.IDiffEditorConstructionOptions = {
     lineNumbersMinChars: 3,
     scrollBeyondLastLine: false,
     renderSideBySide: false,
+    automaticLayout: true,
+    renderLineHighlight: 'none',
+    hideCursorInOverviewRuler: true,
+    overviewRulerBorder: false,
+    scrollbar: {
+        vertical: 'hidden',
+        horizontal: 'hidden',
+    },
 }
 
 function extensionToLanguage(filename: string): string {
@@ -147,11 +163,20 @@ export default function SingleFileEditor() {
         return model;
     }, [activeProject, activeFile, file, project]);
 
+    // Helper function to determine if dark theme should be used
+    const isDarkTheme = useCallback(() => {
+        return theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    }, [theme]);
+
+    // Helper function to get initial Monaco theme
+    const getInitialMonacoTheme = useCallback(() => {
+        return isDarkTheme() ? "vs-dark" : "vs-light";
+    }, [isDarkTheme]);
+
     // Helper function to apply theme
     const applyTheme = useCallback((monaco: typeof import("monaco-editor")) => {
         try {
-            const isDark = theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-            if (isDark) {
+            if (isDarkTheme()) {
                 monaco.editor.setTheme("notebook");
             } else {
                 monaco.editor.setTheme("vs-light");
@@ -159,7 +184,7 @@ export default function SingleFileEditor() {
         } catch (error) {
             console.warn("Failed to apply Monaco theme:", error);
         }
-    }, [theme]);
+    }, [isDarkTheme]);
 
     useEffect(() => {
         function handleKeyDown(e: KeyboardEvent) {
@@ -328,6 +353,7 @@ export default function SingleFileEditor() {
                 className="font-btr-code"
                 height="100%"
                 width="100%"
+                theme={getInitialMonacoTheme()}
                 onMount={(editor, monaco) => {
                     // Store Monaco instances in refs
                     monacoRef.current = monaco;
@@ -347,6 +373,7 @@ export default function SingleFileEditor() {
                         fontFamily: '"DM Mono", monospace',
                         fontSize: 14,
                         lineHeight: 20,
+                        renderLineHighlight: 'none',
                     });
 
                     // Force font remeasuring
@@ -394,6 +421,7 @@ export default function SingleFileEditor() {
                 key={`editor-${theme}`}
                 className="font-btr-code"
                 height="100%"
+                theme={getInitialMonacoTheme()}
                 onMount={(editor, monaco) => {
                     // Store Monaco instances in refs
                     monacoRef.current = monaco;
@@ -426,6 +454,7 @@ export default function SingleFileEditor() {
                         fontFamily: '"DM Mono", monospace',
                         fontSize: 14,
                         lineHeight: 20,
+                        renderLineHighlight: 'none',
                     });
 
                     // Force font remeasuring

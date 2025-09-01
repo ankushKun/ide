@@ -47,6 +47,9 @@ const monacoConfig: editor.IStandaloneEditorConstructionOptions = {
     },
     renderLineHighlight: "none",
     smoothScrolling: true,
+    automaticLayout: true,
+    hideCursorInOverviewRuler: true,
+    overviewRulerBorder: false,
 };
 
 const diffMonacoConfig: editor.IDiffEditorConstructionOptions = {
@@ -120,10 +123,19 @@ const CodeCell: React.FC<CodeCellProps> = ({
         return () => document.removeEventListener("keydown", handleKeyDown);
     }, [cellId]);
 
+    // Helper function to determine if dark theme should be used
+    const isDarkTheme = useCallback(() => {
+        return theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    }, [theme]);
+
+    // Helper function to get initial Monaco theme
+    const getInitialMonacoTheme = useCallback(() => {
+        return isDarkTheme() ? "vs-dark" : "vs-light";
+    }, [isDarkTheme]);
+
     const applyTheme = useCallback((monaco: typeof import("monaco-editor")) => {
         try {
-            const isDark = theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-            if (isDark) {
+            if (isDarkTheme()) {
                 monaco.editor.setTheme("notebook");
             } else {
                 monaco.editor.setTheme("vs-light");
@@ -131,7 +143,7 @@ const CodeCell: React.FC<CodeCellProps> = ({
         } catch (error) {
             console.warn("Failed to apply Monaco theme:", error);
         }
-    }, [theme]);
+    }, [isDarkTheme]);
 
     // Helper function to get or create a model for this cell
     const getOrCreateCellModel = useCallback((monaco: typeof import("monaco-editor"), content: string) => {
@@ -331,6 +343,7 @@ const CodeCell: React.FC<CodeCellProps> = ({
                                 modified={cell.diffNew}
                                 language="lua"
                                 options={diffMonacoConfig}
+                                theme={getInitialMonacoTheme()}
                                 height={
                                     2 * (expand ? Math.max(cell.code.split("\n").length * 20, 60) :
                                         (cell.code.split("\n").length > 15 ? 15 * 20 : Math.max((cell.code.split("\n").length) * 20, 60)))
@@ -366,6 +379,7 @@ const CodeCell: React.FC<CodeCellProps> = ({
                     ) : (
                         <Editor
                             data-cellId={cellId}
+                            theme={getInitialMonacoTheme()}
                             onMount={(editor, monaco) => {
                                 // Store Monaco instances in refs
                                 thisEditor.current = editor;
@@ -485,10 +499,19 @@ const VisualCell: React.FC<VisualCellProps> = ({
     // Track component mounting state to prevent operations on unmounting components
     const isMountedRef = useRef(true);
 
+    // Helper function to determine if dark theme should be used
+    const isDarkTheme = useCallback(() => {
+        return theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    }, [theme]);
+
+    // Helper function to get initial Monaco theme
+    const getInitialMonacoTheme = useCallback(() => {
+        return isDarkTheme() ? "vs-dark" : "vs-light";
+    }, [isDarkTheme]);
+
     const applyTheme = useCallback((monaco: typeof import("monaco-editor")) => {
         try {
-            const isDark = theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-            if (isDark) {
+            if (isDarkTheme()) {
                 monaco.editor.setTheme("notebook");
             } else {
                 monaco.editor.setTheme("vs-light");
@@ -496,7 +519,7 @@ const VisualCell: React.FC<VisualCellProps> = ({
         } catch (error) {
             console.warn("Failed to apply Monaco theme:", error);
         }
-    }, [theme]);
+    }, [isDarkTheme]);
 
     // Helper function to get or create a model for this cell
     const getOrCreateVisualCellModel = useCallback((monaco: typeof import("monaco-editor"), content: string, language: string) => {
@@ -653,6 +676,7 @@ const VisualCell: React.FC<VisualCellProps> = ({
             {editing ? (
                 <div className="min-h-[60px] m-1 rounded-lg overflow-clip bg-background/80 dark:bg-background/60 border border-border/30">
                     <Editor
+                        theme={getInitialMonacoTheme()}
                         onMount={(editor, monaco) => {
                             // Store Monaco instance in ref
                             monacoRef.current = monaco;
