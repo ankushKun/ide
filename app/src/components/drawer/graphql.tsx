@@ -1,6 +1,4 @@
 import { useState, useEffect, useCallback, memo } from "react"
-import { useGlobalState } from "@/hooks/use-global-state"
-import { useProjects } from "@/hooks/use-projects"
 import { useSettings } from "@/hooks/use-settings"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -56,11 +54,7 @@ interface QueryFilters {
 }
 
 const GraphQL = memo(function GraphQL() {
-    const globalState = useGlobalState()
-    const projectsState = useProjects()
     const settings = useSettings()
-
-    const activeProject = globalState.activeProject ? projectsState.projects[globalState.activeProject] : null
 
     // Get GraphQL endpoint from settings
     const endpoint = settings.actions.getGraphqlUrl()

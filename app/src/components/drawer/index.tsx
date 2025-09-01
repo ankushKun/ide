@@ -36,44 +36,53 @@ export default function Drawer() {
     return <div className={cn("w-full h-full max-h-[calc(100vh-50px)] bg-background overflow-clip", drawerOpen && "block")}>
         {!activeProject || !project ? <div className={cn("w-full h-full bg-background overflow-hidden", drawerOpen && "block")}>
             <div className="h-full flex flex-col">
-                {/* No project state */}
-                <div className="flex-1 flex flex-col items-center justify-start p-6 text-center">
-                    <div className="mb-6">
-                        <FolderOpen className="w-12 h-12 text-muted-foreground/50 mx-auto mb-3" />
-                        <h3 className="text-lg font-medium">No Project Opened</h3>
-                        <p className="text-sm text-muted-foreground mt-1">
-                            Select a project to start working
-                        </p>
+                {/* Show GraphQL tab even without project */}
+                {activeTab === "graphql" ? (
+                    <div className="h-full max-h-[calc(100vh-50px)] overflow-clip">
+                        <GraphQL />
                     </div>
-
-                    <div className="w-full max-w-xs space-y-3">
-                        <Button
-                            className="w-full h-10 text-sm font-medium"
-                            onClick={handleViewAllProjects}
-                        >
-                            <FolderOpen className="w-4 h-4 mr-2" />
-                            View All Projects
-                        </Button>
-
-                        <div className="relative">
-                            <div className="absolute inset-0 flex items-center">
-                                <span className="w-full border-t border-border" />
+                ) : (
+                    <>
+                        {/* No project state */}
+                        <div className="flex-1 flex flex-col items-center justify-start p-6 text-center">
+                            <div className="mb-6">
+                                <FolderOpen className="w-12 h-12 text-muted-foreground/50 mx-auto mb-3" />
+                                <h3 className="text-lg font-medium">No Project Opened</h3>
+                                <p className="text-sm text-muted-foreground mt-1">
+                                    Select a project to start working
+                                </p>
                             </div>
-                            <div className="relative flex justify-center text-xs uppercase">
-                                <span className="bg-background px-2 text-muted-foreground">or</span>
+
+                            <div className="w-full max-w-xs space-y-3">
+                                <Button
+                                    className="w-full h-10 text-sm font-medium"
+                                    onClick={handleViewAllProjects}
+                                >
+                                    <FolderOpen className="w-4 h-4 mr-2" />
+                                    View All Projects
+                                </Button>
+
+                                <div className="relative">
+                                    <div className="absolute inset-0 flex items-center">
+                                        <span className="w-full border-t border-border" />
+                                    </div>
+                                    <div className="relative flex justify-center text-xs uppercase">
+                                        <span className="bg-background px-2 text-muted-foreground">or</span>
+                                    </div>
+                                </div>
+
+                                <Button
+                                    variant="outline"
+                                    className="w-full h-10 text-sm font-medium"
+                                    onClick={handleCreateNewProject}
+                                >
+                                    <FolderPlus className="w-4 h-4 mr-2" />
+                                    Create New Project
+                                </Button>
                             </div>
                         </div>
-
-                        <Button
-                            variant="outline"
-                            className="w-full h-10 text-sm font-medium"
-                            onClick={handleCreateNewProject}
-                        >
-                            <FolderPlus className="w-4 h-4 mr-2" />
-                            Create New Project
-                        </Button>
-                    </div>
-                </div>
+                    </>
+                )}
             </div>
         </div> : <div className="h-full max-h-[calc(100vh-50px)] overflow-clip">
             <div className={activeTab === "files" ? "block" : "hidden"}>
