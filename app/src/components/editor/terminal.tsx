@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { Terminal as XTerm } from '@xterm/xterm'
 import { useTheme } from '../theme-provider'
-import { ANSI, cn, isExecutionError, parseOutput, Logger } from '@/lib/utils'
+import { ANSI, cn, isExecutionError, parseOutput } from '@/lib/utils'
 import { useSettings } from '@/hooks/use-settings'
 import { useProjects } from '@/hooks/use-projects'
 import { useGlobalState } from '@/hooks/use-global-state'
@@ -58,7 +58,7 @@ export default function Terminal() {
 
     // Function to update the prompt based on current activeTerminalFile
     const updatePrompt = useCallback(() => {
-        Logger.debug('Active terminal file', window.activeTerminalFile)
+        // Active terminal file logged
         if (!window.activeTerminalFile) {
             window.xtermPrompt = project?.processPrompt || "aos> "
         } else {
@@ -71,7 +71,7 @@ export default function Terminal() {
 
         window.xtermPrompt = window.xtermPrompt.replace("undefined", "aos> ")
 
-        // console.log(window.activeTerminalFile, window.xtermPrompt)
+        // Terminal file and prompt logged
     }, [project])
 
     // Update prompt when project changes
@@ -307,7 +307,7 @@ export default function Terminal() {
                     try {
                         fitAddon.fit()
                     } catch (error) {
-                        console.warn('Initial terminal fit error:', error)
+                        // Initial terminal fit error
                     }
                 }
             }
@@ -330,7 +330,7 @@ export default function Terminal() {
             if (activeProjectId) {
                 const queuedOutputs = getQueuedOutputs(activeProjectId)
                 if (queuedOutputs.length > 0) {
-                    console.log(`Clearing ${queuedOutputs.length} queued outputs for project ${activeProjectId} (already in history)`)
+                    // Clearing queued outputs for project (already in history)
                     clearQueue(activeProjectId)
                 }
             }
@@ -348,7 +348,7 @@ export default function Terminal() {
             const output = eventDetail.output
             const eventId = eventDetail.eventId
 
-            Logger.output('Terminal output', output)
+            // Terminal output logged
             if (xtermRef.current && readlineRef.current) {
                 // Clear the current line before logging output
                 xtermRef.current.write(ANSI.CLEARLINE)
@@ -370,7 +370,7 @@ export default function Terminal() {
 
                 // Send response back to the triggering component if eventId is provided
                 if (eventId) {
-                    Logger.info('Sending response back to the triggering component')
+                    // Sending response back to triggering component
                     const responseEvent = new CustomEvent(`terminal-response-${eventId}`);
                     window.dispatchEvent(responseEvent);
                 }
@@ -479,7 +479,7 @@ export default function Terminal() {
                 try {
                     fitAddonRef.current.fit()
                 } catch (error) {
-                    console.warn('Terminal fit error:', error)
+                    // Terminal fit error
                 }
             }
         }
@@ -690,13 +690,13 @@ export default function Terminal() {
                         // Select by index (1-based)
                         const selectedFileIndex = parsedIndex - 1
                         selectedFile = Object.keys(project?.files || {})[selectedFileIndex]
-                        Logger.debug('Selected file by index', selectedFile)
+                        // Selected file by index
                     } else {
                         // Select by filename
                         const files = project?.files || {}
                         if (files[selectArg]) {
                             selectedFile = selectArg
-                            Logger.debug('Selected file by name', selectedFile)
+                            // Selected file by name
                         }
                     }
 
@@ -728,8 +728,8 @@ export default function Terminal() {
                     try {
                         const isFileProcess = project?.files[window.activeTerminalFile]?.process && project?.files[window.activeTerminalFile]?.process !== project?.process
                         const result = await ao.runLua({ processId: isFileProcess ? project?.files[window.activeTerminalFile]?.process : project?.process, code: text })
-                        Logger.execution('Terminal Lua Execution', text, result, isExecutionError(result))
-                        Logger.debug('Is file process', isFileProcess)
+                        // Terminal Lua execution logged
+                        // Is file process logged
                         if (isFileProcess) {
                             projectsActions.setFileProcessPrompt(activeProject, window.activeTerminalFile, result.output.prompt)
                         } else {

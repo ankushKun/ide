@@ -86,7 +86,7 @@ class VimModeManager {
                         vimInstance.dispose();
                     }
                 } catch (error) {
-                    console.warn(`Failed to dispose vim instance ${id}:`, error);
+                    // Failed to dispose vim instance
                 }
             }
         };
@@ -109,7 +109,7 @@ class VimModeManager {
             this.setActiveVim(id);
         }
 
-        console.log(`Vim instance registered: ${id}`);
+        // Vim instance registered
     }
 
     /**
@@ -135,7 +135,7 @@ class VimModeManager {
             }
 
             this.activeVimId = id;
-            console.log(`Active vim instance set to: ${id}`);
+            // Active vim instance set
         }
     }
 
@@ -180,7 +180,7 @@ class VimModeManager {
                 notebookState.masterVimInstance.dispose();
                 this.vimInstances.delete(notebookState.masterVimInstance.id);
             } catch (error) {
-                console.warn(`Error disposing notebook vim state for ${notebookId}:`, error);
+                // Error disposing notebook vim state
             }
 
             // Clear the notebook state
@@ -193,7 +193,7 @@ class VimModeManager {
                 this.resetStatus();
             }
 
-            console.log(`Disposed notebook vim state: ${notebookId}`);
+            // Disposed notebook vim state
         }
     }
 
@@ -214,7 +214,7 @@ class VimModeManager {
             try {
                 instance.dispose();
             } catch (error) {
-                console.warn(`Error disposing vim instance ${id}:`, error);
+                // Error disposing vim instance
             }
 
             this.vimInstances.delete(id);
@@ -225,7 +225,7 @@ class VimModeManager {
                 this.resetStatus();
             }
 
-            console.log(`Vim instance disposed: ${id}`);
+            // Vim instance disposed
         }
     }
 
@@ -237,7 +237,7 @@ class VimModeManager {
         instancesToDispose.forEach(id => {
             this.disposeVimInstance(id);
         });
-        console.log(`Disposed vim instances with prefix: ${prefix}`);
+        // Disposed vim instances with prefix
     }
 
     /**
@@ -249,7 +249,7 @@ class VimModeManager {
             try {
                 notebookState.masterVimInstance.dispose();
             } catch (error) {
-                console.warn(`Error disposing notebook vim state ${notebookId}:`, error);
+                // Error disposing notebook vim state
             }
         });
         this.notebookVimStates.clear();
@@ -259,14 +259,14 @@ class VimModeManager {
             try {
                 instance.dispose();
             } catch (error) {
-                console.warn(`Error disposing vim instance ${id}:`, error);
+                // Error disposing vim instance
             }
         });
         this.vimInstances.clear();
         this.notebookGroups.clear();
         this.activeVimId = null;
         this.resetStatus();
-        console.log('All vim instances disposed');
+        // All vim instances disposed
     }
 
     /**
@@ -301,7 +301,7 @@ class VimModeManager {
             try {
                 // Ensure the editor is valid
                 if (!editor || typeof editor.getModel !== 'function') {
-                    console.warn(`Invalid editor for notebook vim initialization: ${editorId}`);
+                    // Invalid editor for notebook vim initialization
                     return;
                 }
 
@@ -315,7 +315,7 @@ class VimModeManager {
                             try {
                                 masterVim.dispose();
                             } catch (error) {
-                                console.warn(`Error disposing master vim for notebook ${notebookId}:`, error);
+                                // Error disposing master vim for notebook
                             }
                         }
                     };
@@ -330,10 +330,10 @@ class VimModeManager {
                     this.vimInstances.set(masterInstance.id, masterInstance);
                     this.activeVimId = masterInstance.id;
 
-                    console.log(`Created master vim instance for notebook: ${notebookId}`);
+                    // Created master vim instance for notebook
                 }
             } catch (error) {
-                console.error(`Failed to create master vim for notebook ${notebookId}:`, error);
+                // Failed to create master vim for notebook
                 return;
             }
         }
@@ -368,9 +368,9 @@ class VimModeManager {
             const cellVim = initVimMode(editor, null); // null status node to prevent duplicate indicators
 
             // Store a reference but don't track it as a separate instance
-            console.log(`Synced vim state to cell: ${editorId}`);
+            // Synced vim state to cell
         } catch (error) {
-            console.warn(`Failed to sync vim state to editor ${editorId}:`, error);
+            // Failed to sync vim state to editor
         }
     }
 
@@ -394,7 +394,7 @@ class VimModeManager {
         try {
             // Ensure the editor is still valid before initializing vim
             if (!editor || typeof editor.getModel !== 'function') {
-                console.warn(`Invalid editor for vim initialization: ${editorId}`);
+                // Invalid editor for vim initialization
                 return;
             }
 
@@ -408,12 +408,12 @@ class VimModeManager {
                     onVimReady(vim);
                 }
 
-                console.log(`Vim mode initialized for editor: ${editorId}`, vim);
+                // Vim mode initialized for editor
             } else {
-                console.warn(`Invalid vim instance returned for editor: ${editorId}`);
+                // Invalid vim instance returned for editor
             }
         } catch (error) {
-            console.error(`Failed to initialize vim mode for editor: ${editorId}`, error);
+            // Failed to initialize vim mode for editor
         }
     }
 
@@ -433,7 +433,7 @@ class VimModeManager {
                     // Re-attach the master vim to the focused editor
                     this.switchMasterVimToEditor(notebookId, editorId, editor);
                 } catch (error) {
-                    console.warn(`Failed to switch vim focus to cell ${editorId}:`, error);
+                    // Failed to switch vim focus to cell
                 }
             }
         }
@@ -461,7 +461,7 @@ class VimModeManager {
                         try {
                             newMasterVim.dispose();
                         } catch (error) {
-                            console.warn(`Error disposing master vim for notebook ${notebookId}:`, error);
+                            // Error disposing master vim for notebook
                         }
                     }
                 };
@@ -470,10 +470,10 @@ class VimModeManager {
                 notebookState.masterVimInstance = newMasterInstance;
                 this.vimInstances.set(newMasterInstance.id, newMasterInstance);
 
-                console.log(`Switched master vim to cell: ${editorId}`);
+                // Switched master vim to cell
             }
         } catch (error) {
-            console.error(`Failed to switch master vim to editor ${editorId}:`, error);
+            // Failed to switch master vim to editor
         }
     }
 

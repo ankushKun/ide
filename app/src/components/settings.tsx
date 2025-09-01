@@ -114,12 +114,7 @@ export default function Settings() {
             return
         }
 
-        console.log('Pinging URLs:', {
-            cu: debouncedCuUrl,
-            hb: debouncedHbUrl,
-            gateway: debouncedGatewayUrl,
-            graphql: debouncedGraphqlUrl
-        })
+        // Pinging URLs
 
         const pingUrls = async () => {
             try {
@@ -130,7 +125,7 @@ export default function Settings() {
                     pingGraphql(debouncedGraphqlUrl)
                 ])
 
-                console.log('Ping results:', { cuResult, hbResult, gatewayResult, graphqlResult })
+                // Ping results logged
 
                 setPingResults({
                     cu: cuResult,
@@ -139,7 +134,7 @@ export default function Settings() {
                     graphql: graphqlResult
                 })
             } catch (error) {
-                console.error('Error pinging URLs:', error)
+                // Error pinging URLs
             }
         }
 
@@ -407,7 +402,7 @@ export default function Settings() {
             setTagErrors([])
 
         } catch (error) {
-            console.error("Failed to spawn process:", error)
+            // Failed to spawn process
             toast.error(`Failed to spawn process: ${error instanceof Error ? error.message : 'Unknown error'}`)
         } finally {
             setIsSpawningProcess(false)
@@ -582,7 +577,7 @@ export default function Settings() {
             setFileTagErrors([])
 
         } catch (error) {
-            console.error("Failed to spawn file process:", error)
+            // Failed to spawn file process
             toast.error(`Failed to spawn process: ${error instanceof Error ? error.message : 'Unknown error'}`)
         } finally {
             setIsSpawningFileProcess(false)

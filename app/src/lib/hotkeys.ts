@@ -149,7 +149,7 @@ export const matchesHotkey = (event: KeyboardEvent, hotkey: string): boolean => 
 
     // Debug logging for terminal toggle hotkey
     // if (hotkey === 'Ctrl+`' && (event.ctrlKey || event.metaKey)) {
-    //     console.log('Terminal toggle hotkey debug:', {
+    //     // Terminal toggle hotkey debug
     //         hotkey,
     //         parsed,
     //         eventKey,
@@ -201,17 +201,5 @@ export const getHotkeysByCategory = () => {
 
 // Debug function to test cross-platform compatibility
 export const testPlatformCompatibility = () => {
-    console.log('Platform Detection:')
-    console.log('- isMac:', isMac)
-    console.log('- navigator.platform:', navigator.platform)
-    console.log('- navigator.userAgent:', navigator.userAgent)
-
-    console.log('\nKey Display Examples:')
-    console.log('- Ctrl+N displays as:', getHotkeyDisplay('Ctrl+N'))
-    console.log('- Ctrl+Shift+P displays as:', getHotkeyDisplay('Ctrl+Shift+P'))
-    console.log('- Alt+F displays as:', getHotkeyDisplay('Alt+F'))
-
-    console.log('\nKey Parsing Examples:')
-    console.log('- Ctrl+N parses as:', parseHotkey('Ctrl+N'))
-    console.log('- Ctrl+Shift+P parses as:', parseHotkey('Ctrl+Shift+P'))
+    // Debug logging removed
 }

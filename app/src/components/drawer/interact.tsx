@@ -21,7 +21,6 @@ import {
     X
 } from "lucide-react"
 import { MainnetAO, type Tag } from "@/lib/ao"
-import { Logger } from "@/lib/utils"
 import type { InteractState } from "@/hooks/use-projects"
 import { parseOutput, shortenAddress } from "@/lib/utils"
 import Constants from "@/lib/constants"
@@ -218,7 +217,6 @@ const Interact = memo(function Interact() {
             }
 
             messageTags.push(...tags)
-            Logger.debug('API instance', api)
 
             const ao = new MainnetAO({
                 HB_URL: settings.HB_URL,
@@ -229,15 +227,20 @@ const Interact = memo(function Interact() {
             const result = await ao.write({
                 processId: target,
                 tags: messageTags,
-                data: data || undefined
+                data: data
             })
-            Logger.execution('Message Send', { processId: target, tags: messageTags, data }, result)
 
             setOutput(result)
 
         } catch (error) {
-            Logger.error('Failed to send message', error)
-            setOutput(`Error: ${error}`)
+            // remove the starting 400: from the error message
+            const result = (error as any).message.replace(/^400:/, '')
+            try {
+                const json = JSON.parse(result)
+                setOutput(json)
+            } catch (error) {
+                setOutput(result)
+            }
         } finally {
             setIsLoading(false)
         }

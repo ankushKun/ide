@@ -99,7 +99,7 @@ export default function Welcome() {
                 projects.actions.addRecent(projectName)
             }
         } catch (e) {
-            console.error("Failed to open project:", e)
+            // Failed to open project
         }
     }
 

@@ -3,7 +3,7 @@ import { Button } from "./ui/button";
 import { Database, Wallet, Wallet2, Copy, Unplug, Plug, PartyPopper, Microchip, FileBox, Box } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
-import { ANSI, cn, stripAnsiCodes } from "@/lib/utils";
+import { ANSI, cn, stripAnsiCodes, withDuration } from "@/lib/utils";
 import { Link } from "react-router";
 import { ThemeToggleButton } from "./theme-toggle";
 import { useGlobalState } from "@/hooks/use-global-state";
@@ -15,6 +15,7 @@ import { startLiveMonitoring } from "@/lib/live-mainnet";
 import { MainnetAO } from "@/lib/ao";
 import { createSigner } from "@permaweb/aoconnect";
 import { useApi } from "@arweave-wallet-kit/react";
+import log from "@/lib/logger";
 
 export default function Statusbar() {
     const address = useActiveAddress();
@@ -132,7 +133,7 @@ export default function Statusbar() {
         const responseTimeout = setTimeout(() => {
             if (!responseReceived) {
                 // Terminal didn't respond, add to queue
-                console.log('Terminal not responding, adding to queue:', prefixedOutput.slice(0, 50));
+                // Terminal not responding, adding to queue
                 terminal.queueOutput({
                     output: '\r\n' + prefixedOutput,
                     timestamp: Date.now(),
@@ -192,6 +193,7 @@ export default function Statusbar() {
                             const outputText = result.error || result.output || '';
                             if (outputText) {
                                 sendToTerminal(outputText, processInfo.filename);
+                                log({ type: "debug", label: "Process Output", data: { outputText, filename: processInfo.filename } })
                                 toast.info(stripAnsiCodes(outputText.slice(0, 200)));
                             }
                         }
@@ -210,7 +212,7 @@ export default function Statusbar() {
     }, [allProcesses.map(p => `${p.processId}-${p.filename}-${p.isMainnet}`).join(','), settings])
 
     useEffect(() => {
-        function syncProjectToProcess() {
+        async function syncProjectToProcess() {
             if (!projectProcessId) return;
             const project = projects.projects[globalState.activeProject];
             if (!project) return;
@@ -225,13 +227,9 @@ export default function Statusbar() {
             })
 
             // set a variable in the process containing the entire projects json
-            console.log("SYNC")
-            // print collapsed project string
-            console.groupCollapsed()
-            console.log(JSON.stringify(project))
-            console.groupEnd()
-            ao.runLua({ processId: projectProcessId, code: `betteridea = [===[${JSON.stringify(project)}]===]` })
-            console.groupEnd()
+            // Sync logged
+            log({ type: "info", label: "Syncing Project to Process", data: { projectProcessId, project } })
+            await ao.runLua({ processId: projectProcessId, code: `betteridea = [===[${JSON.stringify(project)}]===]` })
         }
 
         const interval = setInterval(syncProjectToProcess, 15000);

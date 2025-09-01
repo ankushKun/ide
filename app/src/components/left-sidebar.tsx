@@ -83,7 +83,7 @@ export default function LeftSidebar() {
     const handleInstallClick = async () => {
         const success = await installApp()
         if (success) {
-            console.log('PWA installed successfully')
+            // PWA installed successfully
         }
     }
 

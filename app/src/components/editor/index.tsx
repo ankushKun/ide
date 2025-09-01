@@ -11,7 +11,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "../ui/tabs";
 import SingleFileEditor from "./single-file-editor";
 import NotebookEditor from "./notebook-editor";
 import { useTheme } from "@/components/theme-provider";
-import { getFileIconElement, parseOutput, stripAnsiCodes, isExecutionError, isErrorText, Logger } from "@/lib/utils";
+import { getFileIconElement, parseOutput, stripAnsiCodes, isExecutionError, isErrorText } from "@/lib/utils";
 import { useSettings } from "@/hooks/use-settings";
 
 import { MainnetAO } from "@/lib/ao";
@@ -150,7 +150,7 @@ export default function Editor() {
         const responseTimeout = setTimeout(() => {
             if (!responseReceived) {
                 // Terminal didn't respond, add to queue
-                console.log('Terminal not responding, adding to queue:', output.slice(0, 50));
+                // Terminal not responding, adding to queue
                 terminal.queueOutput({
                     output: '\r\n' + output,
                     timestamp: Date.now(),
@@ -231,7 +231,7 @@ export default function Editor() {
             openedFiles.forEach(fileName => {
                 const fileToSave = project?.files[fileName];
                 if (fileToSave) {
-                    // console.log("Auto-saving file before unload:", fileName);
+                    // Auto-saving file before unload
                 }
             });
         };
@@ -270,7 +270,7 @@ export default function Editor() {
 
             // Check if project has a process ID
             if (!project.process && !file.process) {
-                Logger.error('No process ID found', { project, file })
+                // No process ID found
                 const message = "Error: No process ID found for this project/file. Please set a process ID in project settings.";
                 actions.setOutput(message);
                 sendToTerminal(message);
@@ -306,7 +306,7 @@ export default function Editor() {
                     code: code
                 });
                 const isFileProcess = file.process && file.process !== project.process
-                Logger.execution('Mainnet Code Execution', code, result, isExecutionError(result))
+                // Mainnet code execution logged
                 const prompt = result.output.prompt
                 if (isFileProcess) {
                     projectsActions.setFileProcessPrompt(activeProject, activeFile, prompt)
@@ -345,7 +345,7 @@ export default function Editor() {
 
         } catch (error) {
             const errorMessage = `Error running Lua code: ${error instanceof Error ? error.message : String(error)}`;
-            Logger.error('Code execution failed', errorMessage);
+            // Code execution failed
             const fullErrorMessage = `Error: ${errorMessage}`;
             actions.setOutput(fullErrorMessage);
             sendToTerminal(fullErrorMessage);

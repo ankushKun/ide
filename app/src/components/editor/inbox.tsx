@@ -132,7 +132,7 @@ export default function Inbox() {
                 setSelectedMessage(Object.keys(res)[0]);
             }
         } catch (error) {
-            console.error("Failed to load inbox:", error);
+            // Failed to load inbox
         } finally {
             setIsLoading(false);
         }

@@ -141,7 +141,7 @@ export default function Menubar() {
                 setPreviewError("Invalid project data received")
             }
         } catch (error) {
-            console.error("Failed to fetch project:", error)
+            // Failed to fetch project
             setPreviewError("Failed to fetch project. Please check the process ID and try again.")
         } finally {
             setIsLoadingPreview(false)
@@ -502,7 +502,7 @@ export default function Menubar() {
     }
 
     const handleShowCommands = () => {
-        console.log("show commands")
+        // Show commands
         // setIsCommandsOpen(true)
     }
 

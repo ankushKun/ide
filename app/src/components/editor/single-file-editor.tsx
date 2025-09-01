@@ -134,12 +134,12 @@ export default function SingleFileEditor() {
                             };
                             useProjects.getState().actions.setFile(activeProject, updatedFile);
                         } catch (error) {
-                            console.warn("Failed to get model value:", error);
+                            // Failed to get model value
                         }
                     }
                 });
             } catch (error) {
-                console.error("Failed to create Monaco model:", error);
+                // Failed to create Monaco model
                 return null;
             }
         } else {
@@ -149,7 +149,7 @@ export default function SingleFileEditor() {
                     model.setValue(content);
                 }
             } catch (error) {
-                console.warn("Failed to update model content:", error);
+                // Failed to update model content
                 // If model is disposed, remove it from the map and return null
                 modelsRef.current.delete(fileName);
                 return null;
@@ -184,7 +184,7 @@ export default function SingleFileEditor() {
                 monaco.editor.setTheme("vs-light");
             }
         } catch (error) {
-            console.warn("Failed to apply Monaco theme:", error);
+            // Failed to apply Monaco theme
         }
     }, [isDarkTheme]);
 
@@ -256,7 +256,7 @@ export default function SingleFileEditor() {
                                 monacoRef.current.editor.setTheme("vs-light");
                             }
                         } catch (error) {
-                            console.warn("Failed to apply Monaco theme from storage change:", error);
+                            // Failed to apply Monaco theme from storage change
                         }
                     }
                 }, 100);
@@ -273,7 +273,7 @@ export default function SingleFileEditor() {
             try {
                 applyTheme(monacoRef.current);
             } catch (error) {
-                console.warn("Failed to apply theme on context change:", error);
+                // Failed to apply theme on context change
             }
         }
     }, [theme, applyTheme])
@@ -290,7 +290,7 @@ export default function SingleFileEditor() {
                     editorRef.current.setModel(model);
                 }
             } catch (error) {
-                console.warn("Failed to switch models on active file change:", error);
+                // Failed to switch models on active file change
             }
         }
     }, [activeFile, file, getOrCreateFileModel]);
@@ -309,14 +309,14 @@ export default function SingleFileEditor() {
     // Re-initialize vim mode when activeFile changes
     useEffect(() => {
         if (editorRef.current && activeFile && vimManager.isVimModeEnabled()) {
-            console.log(`Re-initializing vim mode for file: ${activeFile}`);
+            // Re-initializing vim mode for file
 
             // Small delay to ensure model switching is complete
             const timeoutId = setTimeout(() => {
                 if (editorRef.current && activeFile) {
-                    console.log(`Executing vim re-initialization for: ${activeFile}`);
+                    // Executing vim re-initialization
                     initializeVimMode(editorRef.current).catch(error => {
-                        console.warn("Failed to initialize vim mode for new file:", error);
+                        // Failed to initialize vim mode for new file
                     });
                 }
             }, 50);
@@ -336,7 +336,7 @@ export default function SingleFileEditor() {
                 try {
                     vimModeRef.current.cleanup();
                 } catch (error) {
-                    console.warn("Failed to cleanup vim focus handlers:", error);
+                    // Failed to cleanup vim focus handlers
                 }
             }
 
@@ -353,7 +353,7 @@ export default function SingleFileEditor() {
                         model.dispose();
                     }
                 } catch (error) {
-                    console.warn(`Failed to dispose Monaco model for ${fileName}:`, error);
+                    // Failed to dispose Monaco model
                 }
             });
             modelsRef.current.clear();
@@ -511,7 +511,7 @@ export default function SingleFileEditor() {
                         try {
                             editor.setModel(model);
                         } catch (error) {
-                            console.warn("Failed to set model to editor:", error);
+                            // Failed to set model to editor
                         }
                     }
 
@@ -544,7 +544,7 @@ export default function SingleFileEditor() {
                             try {
                                 const luamin = require('lua-format')
                                 const input = editor.getValue()
-                                console.log("formatting code")
+                                // Formatting code
                                 const output: string = luamin.Beautify(input, {
                                     RenameVariables: false,
                                     RenameGlobals: false,
@@ -553,11 +553,11 @@ export default function SingleFileEditor() {
                                 // remove source first line
                                 editor.setValue(output.split("\n").slice(1).join("\n").trimStart())
                             } catch (error) {
-                                console.log("Lua format not available, trying default formatting");
+                                // Lua format not available, trying default formatting
                                 try {
                                     await editor.getAction('editor.action.formatDocument')?.run();
                                 } catch (formatError) {
-                                    console.log("Format document not available");
+                                    // Format document not available
                                 }
                             }
                         },

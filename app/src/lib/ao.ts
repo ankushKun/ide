@@ -2,7 +2,8 @@ import { connect } from "@permaweb/aoconnect";
 // import AOCore from "@permaweb/ao-core-libs";
 import Constants from "./constants";
 import { startLiveMonitoring } from "./live-mainnet";
-import { Logger } from "./utils";
+import log from "./logger";
+import { withDuration } from "./utils";
 
 export type Tag = {
     name: string,
@@ -89,7 +90,11 @@ export class MainnetAO {
     }
 
     async operator(): Promise<string> {
-        const scheduler = (await (await fetch(this.hbUrl + '/~meta@1.0/info/address')).text()).trim()
+        const hashpath = this.hbUrl + '/~meta@1.0/info/address'
+        log({ type: "input", label: "Fetching Operator Address", data: hashpath })
+        const { result, duration } = await withDuration(() => fetch(hashpath))
+        const scheduler = (await result.text()).trim()
+        log({ type: "success", label: "Fetched Operator Address", data: scheduler, duration })
         return scheduler
     }
 
@@ -97,13 +102,16 @@ export class MainnetAO {
         let hashpath = this.hbUrl + (path.startsWith("/") ? path : "/" + path)
         // hashpath = hashpath + "/~json@1.0/serialize"
 
-        const res = await fetch(hashpath, {
+        log({ type: "input", label: "Reading Process State", data: { path: hashpath } })
+        const { result, duration } = await withDuration(() => fetch(hashpath, {
             headers: {
                 'accept': "application/json",
                 'accept-bundle': "true",
             }
-        })
-        return this.sanitizeResponse(await res.json()) as T
+        }))
+        const resultJson = await result.json()
+        log({ type: "output", label: "Process State Read", data: resultJson, duration })
+        return this.sanitizeResponse(resultJson) as T
     }
 
     async spawn({ tags, data, module_ }: { tags?: { name: string; value: string }[], data?: any, module_?: string }): Promise<string> {
@@ -140,8 +148,9 @@ export class MainnetAO {
             params.data = data
         }
 
-        Logger.input('Spawn Process', params)
-        const res = await this.ao().request(params)
+        log({ type: "input", label: "Spawning Process", data: params })
+        const { result, duration } = await withDuration(() => this.ao().request(params))
+        log({ type: "success", label: "Process Spawned", data: result, duration })
         // const body: ReadableStream = res.body
         // const reader = body.getReader()
         // const decoder = new TextDecoder()
@@ -151,12 +160,10 @@ export class MainnetAO {
         //     if (done) break
         //     result += decoder.decode(value, { stream: true })
         // }
-        Logger.output('Spawn Response', res)
 
-        const process = (res as any).process
+        const process = (result as any).process
         // const process = await res.headers.get("process")
         // @ts-ignore
-        Logger.info('Process ID', process)
 
         // delay 1s to ensure process is ready
         await new Promise(resolve => setTimeout(resolve, 100))
@@ -169,7 +176,7 @@ export class MainnetAO {
                 gatewayUrl: this.gatewayUrl,
                 intervalMs: 1000,
                 onResult: async (result) => {
-                    Logger.output('Live Monitoring Result', result)
+                    log({ type: "success", label: "Process Live Monitoring Complete", data: result })
                     slot() // Stop monitoring
 
                     // send an initial message to activate the process
@@ -178,9 +185,9 @@ export class MainnetAO {
                             processId: process,
                             code: "require('.process')._version"
                         })
-                        Logger.success('Process initialized', res2)
+                        log({ type: "success", label: "Process Initialized", data: { processId: process, version: res2 } })
                     } catch (error) {
-                        Logger.warning('Failed to initialize process', error)
+                        log({ type: "warning", label: "Process Initialization Warning", data: error })
                     }
 
                     // Return the process ID
@@ -191,7 +198,7 @@ export class MainnetAO {
             resolve(process)
             // }
             // catch (e) {
-            //     console.error("Spawned but failed to initialize process:", e)
+            //     // Spawned but failed to initialize process
             // } finally {
             //     resolve(process)
             // }
@@ -211,7 +218,6 @@ export class MainnetAO {
             'signing-format': 'ANS-104',
             accept: 'application/json',
             // 'accept-bundle': "true",
-            // 'signing-format': 'ANS-104',
         }
 
         // Add tags as properties
@@ -226,24 +232,23 @@ export class MainnetAO {
             params.data = data
         }
 
-        const res = await this.ao().request(params)
-        Logger.output('Write Response', res)
-        const e = await JSON.parse((res as any).body)
-        // const e = await res.json()
-        Logger.output('Parsed Response', e)
+        log({ type: "input", label: "Write Input", data: params })
+        const { result, duration } = await withDuration(() => this.ao().request(params))
+        log({ type: "output", label: "Write Result", data: result, duration })
+        const e = await JSON.parse((result as any).body)
         return e
     }
 
     async runLua({ processId, code }: { processId: string, code: string }) {
-        Logger.execution('Lua Execution', { processId, code }, null)
-        const res = await this.write({
+        log({ type: "debug", label: "Run Lua Input", data: { processId, code } })
+        const { result, duration } = await withDuration(() => this.write({
             processId,
             tags: [
                 { name: "Action", value: "Eval" }
             ],
             data: code
-        })
-        Logger.output('Lua Result', res)
-        return res
+        }))
+        log({ type: "success", label: "Run Lua Output", data: result, duration })
+        return result
     }
 }

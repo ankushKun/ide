@@ -127,12 +127,12 @@ export function startLiveMonitoring(
 
         } catch (error) {
             consecutiveErrors++
-            console.error(`Error in live monitoring (${consecutiveErrors}/${maxConsecutiveErrors}):`, error)
+            // Error in live monitoring
 
             // Stop monitoring if we've hit the maximum consecutive errors
             if (consecutiveErrors >= maxConsecutiveErrors) {
-                console.warn(`Live monitoring stopped for process ${processId}: ${maxConsecutiveErrors} consecutive errors encountered`)
-                console.error('Maximum consecutive errors reached. Stopping live monitoring.')
+                // Live monitoring stopped for process
+                // Maximum consecutive errors reached. Stopping live monitoring
                 isRunning = false
                 return
             }

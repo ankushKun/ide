@@ -7,7 +7,7 @@ import { useEffect, useState } from "react"
 import { useGlobalState } from "@/hooks/use-global-state"
 import { useProjects, type File } from "@/hooks/use-projects"
 import { useSettings } from "@/hooks/use-settings"
-import { Logger, validateArweaveId } from "@/lib/utils"
+import { validateArweaveId } from "@/lib/utils"
 import { CheckCircle, AlertCircle, Plus, X, Tag as TagIcon } from "lucide-react"
 import { MainnetAO } from "@/lib/ao"
 import Constants from "@/lib/constants"
@@ -364,7 +364,7 @@ export default function NewFile() {
             setGeneralError("")
 
         } catch (error) {
-            Logger.error('Failed to create file', error)
+            // Failed to create file
             setGeneralError(`Failed to create file: ${error instanceof Error ? error.message : 'Unknown error'}`)
         } finally {
             setIsCreating(false)

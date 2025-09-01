@@ -137,12 +137,12 @@ const CodeCell: React.FC<CodeCellProps> = ({
     }, [cellId]);
 
     const runCellCode = async () => {
-        console.log("running cell code", cellId);
+        // Running cell code
         setRunning(true);
         try {
             await onRunCell(cellId, cell.code);
         } catch (error) {
-            console.error("Error running cell:", error);
+            // Error running cell
         } finally {
             setRunning(false);
         }
@@ -181,7 +181,7 @@ const CodeCell: React.FC<CodeCellProps> = ({
                 monaco.editor.setTheme("vs-light");
             }
         } catch (error) {
-            console.warn("Failed to apply Monaco theme:", error);
+            // Failed to apply Monaco theme
         }
     }, [isDarkTheme]);
 
@@ -204,12 +204,12 @@ const CodeCell: React.FC<CodeCellProps> = ({
                             const updatedContent = modelRef.current.getValue();
                             onUpdateCell(cellId, { code: updatedContent });
                         } catch (error) {
-                            console.warn("Failed to get model value:", error);
+                            // Failed to get model value
                         }
                     }
                 });
             } catch (error) {
-                console.error("Failed to create Monaco model for cell:", error);
+                // Failed to create Monaco model for cell
                 return null;
             }
         } else {
@@ -219,7 +219,7 @@ const CodeCell: React.FC<CodeCellProps> = ({
                     modelRef.current.setValue(content);
                 }
             } catch (error) {
-                console.error("Failed to update Monaco model for cell:", error);
+                // Failed to update Monaco model for cell
                 // If model is disposed, clear the ref and return null
                 if (modelRef.current && modelRef.current.isDisposed()) {
                     modelRef.current = null;
@@ -247,7 +247,7 @@ const CodeCell: React.FC<CodeCellProps> = ({
                                 monacoRef.current.editor.setTheme("vs-light");
                             }
                         } catch (error) {
-                            console.warn("Failed to apply Monaco theme from storage change:", error);
+                            // Failed to apply Monaco theme from storage change
                         }
                     }
                 }, 100);
@@ -280,7 +280,7 @@ const CodeCell: React.FC<CodeCellProps> = ({
                 try {
                     vimModeRef.current.cleanup();
                 } catch (error) {
-                    console.warn("Failed to cleanup vim focus handlers:", error);
+                    // Failed to cleanup vim focus handlers
                 }
             }
 
@@ -304,7 +304,7 @@ const CodeCell: React.FC<CodeCellProps> = ({
                         model.dispose();
                     }
                 } catch (error) {
-                    console.warn("Failed to dispose Monaco model for cell:", error);
+                    // Failed to dispose Monaco model for cell
                 }
             }
         };
@@ -459,7 +459,7 @@ const CodeCell: React.FC<CodeCellProps> = ({
                                     try {
                                         editor.setModel(model);
                                     } catch (error) {
-                                        console.error("Failed to set Monaco model for cell:", error);
+                                        // Failed to set Monaco model for cell
                                     }
                                 }
 
@@ -480,12 +480,12 @@ const CodeCell: React.FC<CodeCellProps> = ({
                                         try {
                                             // Try to format Lua code if available
                                             const input = editor.getValue();
-                                            console.log("formatting code");
+                                            // Formatting code
                                             // For now, just use basic formatting
                                             const formatted = input.split('\n').map(line => line.trim()).join('\n');
                                             editor.setValue(formatted);
                                         } catch (error) {
-                                            console.log("Format not available");
+                                            // Format not available
                                         }
                                     },
                                 });
@@ -578,7 +578,7 @@ const VisualCell: React.FC<VisualCellProps> = ({
                 monaco.editor.setTheme("vs-light");
             }
         } catch (error) {
-            console.warn("Failed to apply Monaco theme:", error);
+            // Failed to apply Monaco theme
         }
     }, [isDarkTheme]);
 
@@ -639,12 +639,12 @@ const VisualCell: React.FC<VisualCellProps> = ({
                             const updatedContent = modelRef.current.getValue();
                             onUpdateCell(cellId, { code: updatedContent });
                         } catch (error) {
-                            console.warn("Failed to get model value:", error);
+                            // Failed to get model value
                         }
                     }
                 });
             } catch (error) {
-                console.error("Failed to create Monaco model for visual cell:", error);
+                // Failed to create Monaco model for visual cell
                 return null;
             }
         } else {
@@ -654,7 +654,7 @@ const VisualCell: React.FC<VisualCellProps> = ({
                     modelRef.current.setValue(content);
                 }
             } catch (error) {
-                console.error("Failed to update Monaco model for visual cell:", error);
+                // Failed to update Monaco model for visual cell
                 // Don't immediately clear the ref - let it be cleaned up later
                 return modelRef.current;
             }
@@ -678,7 +678,7 @@ const VisualCell: React.FC<VisualCellProps> = ({
                                 monacoRef.current.editor.setTheme("vs-light");
                             }
                         } catch (error) {
-                            console.warn("Failed to apply Monaco theme from storage change:", error);
+                            // Failed to apply Monaco theme from storage change
                         }
                     }
                 }, 100);
@@ -711,7 +711,7 @@ const VisualCell: React.FC<VisualCellProps> = ({
                 try {
                     vimModeRef.current.cleanup();
                 } catch (error) {
-                    console.warn("Failed to cleanup vim focus handlers:", error);
+                    // Failed to cleanup vim focus handlers
                 }
             }
 
@@ -729,7 +729,7 @@ const VisualCell: React.FC<VisualCellProps> = ({
                         model.dispose();
                     }
                 } catch (error) {
-                    console.warn("Failed to dispose Monaco model for cell:", error);
+                    // Failed to dispose Monaco model for cell
                 }
             }
         };
@@ -812,7 +812,7 @@ const VisualCell: React.FC<VisualCellProps> = ({
                                 try {
                                     editor.setModel(model);
                                 } catch (error) {
-                                    console.error("Failed to set Monaco model for visual cell:", error);
+                                    // Failed to set Monaco model for visual cell
                                 }
                             }
 
@@ -951,13 +951,13 @@ export default function NotebookEditor() {
                         monaco.editor.setTheme(themeName);
                     }
                 } catch (error) {
-                    console.warn("Failed to set theme for Monaco instance:", error);
+                    // Failed to set theme for Monaco instance
                     // Remove invalid Monaco instance from the set
                     monacoInstancesRef.current.delete(monaco);
                 }
             });
         } catch (error) {
-            console.warn("Failed to apply theme to all Monaco instances:", error);
+            // Failed to apply theme to all Monaco instances
         }
     }, [theme]);
 
@@ -979,13 +979,13 @@ export default function NotebookEditor() {
                                     monaco.editor.setTheme(themeName);
                                 }
                             } catch (error) {
-                                console.warn("Failed to set theme for Monaco instance:", error);
+                                // Failed to set theme for Monaco instance
                                 // Remove invalid Monaco instance from the set
                                 monacoInstancesRef.current.delete(monaco);
                             }
                         });
                     } catch (error) {
-                        console.warn("Failed to handle storage theme change:", error);
+                        // Failed to handle storage theme change
                     }
                 }, 100);
             }
@@ -1022,7 +1022,7 @@ export default function NotebookEditor() {
         const responseTimeout = setTimeout(() => {
             if (!responseReceived) {
                 // Terminal didn't respond, add to queue
-                console.log('Terminal not responding, adding to queue:', output.slice(0, 50));
+                // Terminal not responding, adding to queue
                 terminal.queueOutput({
                     output: '\r\n' + output,
                     timestamp: Date.now(),
@@ -1158,7 +1158,7 @@ export default function NotebookEditor() {
     };
 
     const runCell = async (cellId: string, code: string) => {
-        console.log("Running cell:", cellId, "with code:", code);
+        // Running cell with code
 
         if (!code.trim()) {
             const errorMsg = "No code to execute";
@@ -1231,7 +1231,7 @@ export default function NotebookEditor() {
                     toast.error("Cell execution failed");
                 }
 
-                console.log("Mainnet execution completed:", result);
+                // Mainnet execution completed
 
             } else {
                 updateCell(cellId, { output: "Testnet execution is currently disabled. Please use a mainnet project." });
@@ -1240,7 +1240,7 @@ export default function NotebookEditor() {
 
         } catch (error) {
             const errorMessage = `Error: ${error instanceof Error ? error.message : String(error)}`;
-            console.error("Cell execution error:", errorMessage);
+            // Cell execution error
             updateCell(cellId, { output: errorMessage });
             globalActions.setOutput(errorMessage);
             toast.error("Failed to execute code");

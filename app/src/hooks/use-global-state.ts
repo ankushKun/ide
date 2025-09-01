@@ -103,7 +103,7 @@ const globalStateStore = create<GlobalState>()(persist((set, get) => ({
         setFile: (projectId: string, file: File) => {
             // This will be handled by the useProjects hook
             // We're adding this here for consistency with the interface
-            console.log("setFile called with:", projectId, file);
+            // setFile called with projectId and file
         },
         setOutput: (output: string) => set({ output }),
         addHistoryEntry: (entry: Omit<HistoryEntry, 'id' | 'timestamp'>) => set((state) => ({

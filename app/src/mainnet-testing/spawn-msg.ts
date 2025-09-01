@@ -13,7 +13,7 @@ const ar = new Arweave({
 
 const jwk = JSON.parse(fs.readFileSync("../../wallet.json", "utf8"))
 const address = await ar.wallets.jwkToAddress(jwk)
-console.log("ADDRESS: ", address, "\n\n\n\n")
+// Address logged
 
 // const jwk = await ar.wallets.generate()
 
@@ -32,7 +32,7 @@ const ao = AOCore.init({ signer, url: hbUrl, gatewayUrl });
 //     signer: signer
 // })
 
-console.log("SPAWNING")
+// Spawning
 const params = {
     path: '/push',
     method: 'POST',
@@ -52,12 +52,12 @@ const params = {
     Module: mainnet_module,
     scheduler: hb_operator,
 }
-console.log("PARAMS: ", params)
+// Params logged
 const res = await ao.request(params)
-// console.log("\n\n\nRES: ", res.headers, "\n\n\n")
+// Res headers logged
 
 const processId = res.headers.get("process")
-console.log("PROCESS: ", processId, "\n\n\n\n")
+// Process ID logged
 // process.exit(0); // make process work and then we move on to the next step
 
 // @ts-ignore
@@ -71,7 +71,7 @@ await new Promise(resolve => setTimeout(resolve, 1000))
 //     gatewayUrl: gatewayUrl,
 //     intervalMs: 1000,
 //     onResult: async (result) => {
-//         console.log(result)
+//         // Result logged
 //         slot()
 //         Promise.resolve(processId)
 //     }
@@ -88,10 +88,10 @@ const res2 = await ao.request({
     'signing-format': 'ans104',
     data: "require('.process')._version"
 })
-// console.log(res2)
+// Res2 logged
 
 
-console.log("RES2: ", await res2.body.json())
+// Res2 body logged
 
 
 
@@ -116,4 +116,4 @@ const res3 = await ao.request({
     data: "print('testestsetsetes')"
 })
 
-console.log("RES3: ", await res3.body.json())
+// Res3 body logged

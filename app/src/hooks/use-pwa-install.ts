@@ -61,7 +61,7 @@ export function usePWAInstall() {
 
             return false
         } catch (error) {
-            console.error('Error installing PWA:', error)
+            // Error installing PWA
             return false
         }
     }
@@ -84,7 +84,7 @@ export function usePWAInstall() {
             window.open(startUrl, '_blank')
             return true
         } catch (error) {
-            console.error('Error opening installed app:', error)
+            // Error opening installed app
             return false
         }
     }

@@ -24,7 +24,7 @@ import {
 } from "lucide-react"
 import { MainnetAO, type Tag } from "@/lib/ao"
 import type { InteractState } from "@/hooks/use-projects"
-import { parseOutput, shortenAddress, isExecutionError, Logger } from "@/lib/utils"
+import { parseOutput, shortenAddress, isExecutionError } from "@/lib/utils"
 import Constants from "@/lib/constants"
 import { useSettings } from "@/hooks/use-settings"
 import { createSigner } from "@permaweb/aoconnect"
@@ -200,13 +200,13 @@ const Relayer = memo(function Relayer() {
                 code: luaCode
             })
 
-            Logger.execution('Relayer Lua Execution', luaCode, result, isExecutionError(result))
+            // Relayer Lua execution logged
 
             const hasError = isExecutionError(result)
-            Logger.debug('Has error', hasError)
+            // Has error logged
 
             setOutput(result)
-            Logger.output('Relayer output', result, hasError)
+            // Relayer output logged
 
             // Show error toast if execution failed
             if (hasError) {
@@ -214,7 +214,7 @@ const Relayer = memo(function Relayer() {
             }
 
         } catch (error) {
-            Logger.error('Failed to execute Lua code', error)
+            // Failed to execute Lua code
             const errorMsg = `Error: ${error}`
             setOutput(errorMsg)
         } finally {
