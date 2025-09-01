@@ -104,9 +104,9 @@ export default function Welcome() {
     }
 
     return (
-        <div className="p-5 text-foreground overflow-scroll h-full flex flex-col justify-center">
+        <div className="p-5 text-foreground overflow-scroll h-full flex flex-col items-center justify-center">
             {/* Hero Section - Outside Grid */}
-            <div className="mt-auto ml-18">
+            <div className="text-left mb-20 max-w-4xl w-full">
                 <h1 className="text-6xl font-bold mb-2" suppressHydrationWarning>
                     BetterIDEa
                 </h1>
@@ -116,7 +116,7 @@ export default function Welcome() {
             </div>
 
             {/* 2x2 Grid Content */}
-            <div className="grid grid-cols-2 gap-8 max-w-4xl my-auto items-start justify-start ml-20">
+            <div className="grid grid-cols-2 gap-8 max-w-4xl w-full items-start">
 
                 {/* Top Left - Quick Actions */}
                 <div className="flex flex-col">
@@ -211,7 +211,7 @@ export default function Welcome() {
             </div>
 
             {/* Centered Footer */}
-            <div className="text-center py-4 mt-auto">
+            <div className="text-center py-4 absolute bottom-6">
                 <p className="text-xs text-muted-foreground">
                     Built with ❤️ for the permaweb
                 </p>

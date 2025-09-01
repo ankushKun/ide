@@ -55,10 +55,12 @@ export class MainnetAO {
             'accept-encoding',
             'accept-language',
             'connection',
+            'commitments',
             'device',
             'host',
             'method',
             'priority',
+            'status',
             'sec-ch-ua',
             'sec-ch-ua-mobile',
             'sec-ch-ua-platform',
@@ -93,10 +95,15 @@ export class MainnetAO {
 
     async read<T>({ path }: { path: string }): Promise<T> {
         let hashpath = this.hbUrl + (path.startsWith("/") ? path : "/" + path)
-        hashpath = hashpath + "/~json@1.0/serialize"
+        // hashpath = hashpath + "/~json@1.0/serialize"
 
-        const res = await fetch(hashpath)
-        return (await res.json()) as T
+        const res = await fetch(hashpath, {
+            headers: {
+                'accept': "application/json",
+                'accept-bundle': "true",
+            }
+        })
+        return this.sanitizeResponse(await res.json()) as T
     }
 
     async spawn({ tags, data, module_ }: { tags?: { name: string; value: string }[], data?: any, module_?: string }): Promise<string> {
