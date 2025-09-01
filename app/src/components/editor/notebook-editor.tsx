@@ -121,11 +121,15 @@ const CodeCell: React.FC<CodeCellProps> = ({
     }, [cellId]);
 
     const applyTheme = useCallback((monaco: typeof import("monaco-editor")) => {
-        const isDark = theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-        if (isDark) {
-            monaco.editor.setTheme("notebook");
-        } else {
-            monaco.editor.setTheme("vs-light");
+        try {
+            const isDark = theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+            if (isDark) {
+                monaco.editor.setTheme("notebook");
+            } else {
+                monaco.editor.setTheme("vs-light");
+            }
+        } catch (error) {
+            console.warn("Failed to apply Monaco theme:", error);
         }
     }, [theme]);
 
@@ -143,9 +147,13 @@ const CodeCell: React.FC<CodeCellProps> = ({
 
                 // Listen for model changes to update the cell content
                 modelRef.current.onDidChangeContent(() => {
-                    if (isMountedRef.current && modelRef.current) {
-                        const updatedContent = modelRef.current.getValue();
-                        onUpdateCell(cellId, { code: updatedContent });
+                    if (isMountedRef.current && modelRef.current && !modelRef.current.isDisposed()) {
+                        try {
+                            const updatedContent = modelRef.current.getValue();
+                            onUpdateCell(cellId, { code: updatedContent });
+                        } catch (error) {
+                            console.warn("Failed to get model value:", error);
+                        }
                     }
                 });
             } catch (error) {
@@ -155,12 +163,16 @@ const CodeCell: React.FC<CodeCellProps> = ({
         } else {
             // Update existing model content if it differs
             try {
-                if (modelRef.current.getValue() !== content) {
+                if (modelRef.current && !modelRef.current.isDisposed() && modelRef.current.getValue() !== content) {
                     modelRef.current.setValue(content);
                 }
             } catch (error) {
                 console.error("Failed to update Monaco model for cell:", error);
-                // Don't immediately clear the ref - let it be cleaned up later
+                // If model is disposed, clear the ref and return null
+                if (modelRef.current && modelRef.current.isDisposed()) {
+                    modelRef.current = null;
+                    return null;
+                }
                 return modelRef.current;
             }
         }
@@ -175,11 +187,15 @@ const CodeCell: React.FC<CodeCellProps> = ({
                 // Force Monaco to update theme when storage changes
                 setTimeout(() => {
                     if (monacoRef.current) {
-                        const isDark = e.newValue === "dark" || (e.newValue === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-                        if (isDark) {
-                            monacoRef.current.editor.setTheme("notebook");
-                        } else {
-                            monacoRef.current.editor.setTheme("vs-light");
+                        try {
+                            const isDark = e.newValue === "dark" || (e.newValue === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+                            if (isDark) {
+                                monacoRef.current.editor.setTheme("notebook");
+                            } else {
+                                monacoRef.current.editor.setTheme("vs-light");
+                            }
+                        } catch (error) {
+                            console.warn("Failed to apply Monaco theme from storage change:", error);
                         }
                     }
                 }, 100);
@@ -203,26 +219,27 @@ const CodeCell: React.FC<CodeCellProps> = ({
             // Mark component as unmounted to prevent further operations
             isMountedRef.current = false;
 
+            // Unregister Monaco instance first to prevent theme changes
             if (monacoRef.current) {
                 unregisterMonacoInstance(monacoRef.current);
+                monacoRef.current = null;
             }
             if (diffEditorRef.current) {
-                // DiffEditor uses the same Monaco instance, so no need to unregister twice
+                diffEditorRef.current = null;
             }
+
             // Dispose the model when component unmounts
             if (modelRef.current) {
-                const model = modelRef.current;
-                modelRef.current = null;
-                // Defer disposal to avoid race conditions
-                setTimeout(() => {
-                    try {
-                        if (!model.isDisposed()) {
-                            model.dispose();
-                        }
-                    } catch (error) {
-                        console.warn("Failed to dispose Monaco model for cell:", error);
+                try {
+                    const model = modelRef.current;
+                    modelRef.current = null;
+                    // Check if model is still valid before disposing
+                    if (model && !model.isDisposed()) {
+                        model.dispose();
                     }
-                }, 100);
+                } catch (error) {
+                    console.warn("Failed to dispose Monaco model for cell:", error);
+                }
             }
         };
     }, [unregisterMonacoInstance]);
@@ -469,11 +486,15 @@ const VisualCell: React.FC<VisualCellProps> = ({
     const isMountedRef = useRef(true);
 
     const applyTheme = useCallback((monaco: typeof import("monaco-editor")) => {
-        const isDark = theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-        if (isDark) {
-            monaco.editor.setTheme("notebook");
-        } else {
-            monaco.editor.setTheme("vs-light");
+        try {
+            const isDark = theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+            if (isDark) {
+                monaco.editor.setTheme("notebook");
+            } else {
+                monaco.editor.setTheme("vs-light");
+            }
+        } catch (error) {
+            console.warn("Failed to apply Monaco theme:", error);
         }
     }, [theme]);
 
@@ -491,9 +512,13 @@ const VisualCell: React.FC<VisualCellProps> = ({
 
                 // Listen for model changes to update the cell content
                 modelRef.current.onDidChangeContent(() => {
-                    if (isMountedRef.current && modelRef.current) {
-                        const updatedContent = modelRef.current.getValue();
-                        onUpdateCell(cellId, { code: updatedContent });
+                    if (isMountedRef.current && modelRef.current && !modelRef.current.isDisposed()) {
+                        try {
+                            const updatedContent = modelRef.current.getValue();
+                            onUpdateCell(cellId, { code: updatedContent });
+                        } catch (error) {
+                            console.warn("Failed to get model value:", error);
+                        }
                     }
                 });
             } catch (error) {
@@ -523,11 +548,15 @@ const VisualCell: React.FC<VisualCellProps> = ({
                 // Force Monaco to update theme when storage changes
                 setTimeout(() => {
                     if (monacoRef.current) {
-                        const isDark = e.newValue === "dark" || (e.newValue === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-                        if (isDark) {
-                            monacoRef.current.editor.setTheme("notebook");
-                        } else {
-                            monacoRef.current.editor.setTheme("vs-light");
+                        try {
+                            const isDark = e.newValue === "dark" || (e.newValue === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+                            if (isDark) {
+                                monacoRef.current.editor.setTheme("notebook");
+                            } else {
+                                monacoRef.current.editor.setTheme("vs-light");
+                            }
+                        } catch (error) {
+                            console.warn("Failed to apply Monaco theme from storage change:", error);
                         }
                     }
                 }, 100);
@@ -556,18 +585,16 @@ const VisualCell: React.FC<VisualCellProps> = ({
             }
             // Dispose the model when component unmounts
             if (modelRef.current) {
-                const model = modelRef.current;
-                modelRef.current = null;
-                // Defer disposal to avoid race conditions
-                setTimeout(() => {
-                    try {
-                        if (!model.isDisposed()) {
-                            model.dispose();
-                        }
-                    } catch (error) {
-                        console.warn("Failed to dispose Monaco model for cell:", error);
+                try {
+                    const model = modelRef.current;
+                    modelRef.current = null;
+                    // Check if model is still valid before disposing
+                    if (model && !model.isDisposed()) {
+                        model.dispose();
                     }
-                }, 100);
+                } catch (error) {
+                    console.warn("Failed to dispose Monaco model for cell:", error);
+                }
             }
         };
     }, [unregisterMonacoInstance]);
@@ -771,16 +798,27 @@ export default function NotebookEditor() {
 
     // Apply theme to all Monaco instances
     const applyThemeToAll = useCallback(() => {
-        const isDark = theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-        const themeName = isDark ? "notebook" : "vs-light";
+        try {
+            const isDark = theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+            const themeName = isDark ? "notebook" : "vs-light";
 
-        monacoInstancesRef.current.forEach(monaco => {
-            try {
-                monaco.editor.setTheme(themeName);
-            } catch (error) {
-                console.warn("Failed to set theme for Monaco instance:", error);
-            }
-        });
+            // Create a copy of the set to avoid modification during iteration
+            const instances = Array.from(monacoInstancesRef.current);
+
+            instances.forEach(monaco => {
+                try {
+                    if (monaco && monaco.editor) {
+                        monaco.editor.setTheme(themeName);
+                    }
+                } catch (error) {
+                    console.warn("Failed to set theme for Monaco instance:", error);
+                    // Remove invalid Monaco instance from the set
+                    monacoInstancesRef.current.delete(monaco);
+                }
+            });
+        } catch (error) {
+            console.warn("Failed to apply theme to all Monaco instances:", error);
+        }
     }, [theme]);
 
     // Theme change listeners
@@ -788,16 +826,27 @@ export default function NotebookEditor() {
         const handleStorageChange = (e: StorageEvent) => {
             if (e.key === "vite-ui-theme") {
                 setTimeout(() => {
-                    const isDark = e.newValue === "dark" || (e.newValue === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-                    const themeName = isDark ? "notebook" : "vs-light";
+                    try {
+                        const isDark = e.newValue === "dark" || (e.newValue === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+                        const themeName = isDark ? "notebook" : "vs-light";
 
-                    monacoInstancesRef.current.forEach(monaco => {
-                        try {
-                            monaco.editor.setTheme(themeName);
-                        } catch (error) {
-                            console.warn("Failed to set theme for Monaco instance:", error);
-                        }
-                    });
+                        // Create a copy of the set to avoid modification during iteration
+                        const instances = Array.from(monacoInstancesRef.current);
+
+                        instances.forEach(monaco => {
+                            try {
+                                if (monaco && monaco.editor) {
+                                    monaco.editor.setTheme(themeName);
+                                }
+                            } catch (error) {
+                                console.warn("Failed to set theme for Monaco instance:", error);
+                                // Remove invalid Monaco instance from the set
+                                monacoInstancesRef.current.delete(monaco);
+                            }
+                        });
+                    } catch (error) {
+                        console.warn("Failed to handle storage theme change:", error);
+                    }
                 }, 100);
             }
         };

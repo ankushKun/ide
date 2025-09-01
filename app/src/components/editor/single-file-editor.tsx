@@ -74,46 +74,74 @@ export default function SingleFileEditor() {
     const getOrCreateFileModel = useCallback((monaco: typeof import("monaco-editor"), fileName: string, content: string, language: string) => {
         let model = modelsRef.current.get(fileName);
 
+        // Check if existing model is disposed and remove it
+        if (model && model.isDisposed()) {
+            modelsRef.current.delete(fileName);
+            model = null;
+        }
+
         if (!model) {
-            // Create a unique URI for this file
-            const uri = monaco.Uri.parse(`file:///${activeProject}/${fileName}`);
-            model = monaco.editor.createModel(content, language, uri);
-            modelsRef.current.set(fileName, model);
+            try {
+                // Create a unique URI for this file
+                const uri = monaco.Uri.parse(`file:///${activeProject}/${fileName}`);
+                model = monaco.editor.createModel(content, language, uri);
+                modelsRef.current.set(fileName, model);
 
-            // Listen for model changes to update the file content
-            model.onDidChangeContent(() => {
-                if (fileName === activeFile && file && project) {
-                    const updatedContent = model?.getValue() || "";
-                    const firstCellId = file.cellOrder[0];
+                // Listen for model changes to update the file content
+                model.onDidChangeContent(() => {
+                    if (fileName === activeFile && file && project && model && !model.isDisposed()) {
+                        try {
+                            const updatedContent = model.getValue() || "";
+                            const firstCellId = file.cellOrder[0];
 
-                    // Ensure cells object exists and has the cell
-                    const cells = file.cells || {};
-                    const currentCell = cells[firstCellId] || {
-                        id: firstCellId,
-                        content: "",
-                        output: "",
-                        type: "CODE" as const,
-                        editing: false
-                    };
+                            // Ensure cells object exists and has the cell
+                            const cells = file.cells || {};
+                            const currentCell = cells[firstCellId] || {
+                                id: firstCellId,
+                                content: "",
+                                output: "",
+                                type: "CODE" as const,
+                                editing: false
+                            };
 
-                    const updatedFile = {
-                        ...file,
-                        cells: {
-                            ...cells,
-                            [firstCellId]: {
-                                ...currentCell,
-                                content: updatedContent
-                            }
+                            const updatedFile = {
+                                ...file,
+                                cells: {
+                                    ...cells,
+                                    [firstCellId]: {
+                                        ...currentCell,
+                                        content: updatedContent
+                                    }
+                                }
+                            };
+                            useProjects.getState().actions.setFile(activeProject, updatedFile);
+                        } catch (error) {
+                            console.warn("Failed to get model value:", error);
                         }
-                    };
-                    useProjects.getState().actions.setFile(activeProject, updatedFile);
-                }
-            });
+                    }
+                });
+            } catch (error) {
+                console.error("Failed to create Monaco model:", error);
+                return null;
+            }
         } else {
             // Update existing model content if it differs
-            if (model.getValue() !== content) {
-                model.setValue(content);
+            try {
+                if (model && !model.isDisposed() && model.getValue() !== content) {
+                    model.setValue(content);
+                }
+            } catch (error) {
+                console.warn("Failed to update model content:", error);
+                // If model is disposed, remove it from the map and return null
+                modelsRef.current.delete(fileName);
+                return null;
             }
+        }
+
+        // Final check before returning
+        if (model && model.isDisposed()) {
+            modelsRef.current.delete(fileName);
+            return null;
         }
 
         return model;
@@ -121,11 +149,15 @@ export default function SingleFileEditor() {
 
     // Helper function to apply theme
     const applyTheme = useCallback((monaco: typeof import("monaco-editor")) => {
-        const isDark = theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-        if (isDark) {
-            monaco.editor.setTheme("notebook");
-        } else {
-            monaco.editor.setTheme("vs-light");
+        try {
+            const isDark = theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+            if (isDark) {
+                monaco.editor.setTheme("notebook");
+            } else {
+                monaco.editor.setTheme("vs-light");
+            }
+        } catch (error) {
+            console.warn("Failed to apply Monaco theme:", error);
         }
     }, [theme]);
 
@@ -151,12 +183,16 @@ export default function SingleFileEditor() {
             if (e.key === "vite-ui-theme" && monacoRef.current) {
                 // Force Monaco to update theme when storage changes
                 setTimeout(() => {
-                    if (monacoRef.current) {
-                        const isDark = e.newValue === "dark" || (e.newValue === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-                        if (isDark) {
-                            monacoRef.current.editor.setTheme("notebook");
-                        } else {
-                            monacoRef.current.editor.setTheme("vs-light");
+                    if (monacoRef.current && monacoRef.current.editor) {
+                        try {
+                            const isDark = e.newValue === "dark" || (e.newValue === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+                            if (isDark) {
+                                monacoRef.current.editor.setTheme("notebook");
+                            } else {
+                                monacoRef.current.editor.setTheme("vs-light");
+                            }
+                        } catch (error) {
+                            console.warn("Failed to apply Monaco theme from storage change:", error);
                         }
                     }
                 }, 100);
@@ -169,20 +205,28 @@ export default function SingleFileEditor() {
 
     // React to theme context changes
     useEffect(() => {
-        if (monacoRef.current) {
-            applyTheme(monacoRef.current);
+        if (monacoRef.current && monacoRef.current.editor) {
+            try {
+                applyTheme(monacoRef.current);
+            } catch (error) {
+                console.warn("Failed to apply theme on context change:", error);
+            }
         }
     }, [theme, applyTheme])
 
     // Handle active file changes - switch models
     useEffect(() => {
-        if (editorRef.current && monacoRef.current && activeFile && file) {
-            const content = file.cells?.[file.cellOrder[0]]?.content || "";
-            const language = extensionToLanguage(activeFile);
-            const model = getOrCreateFileModel(monacoRef.current, activeFile, content, language);
+        if (editorRef.current && monacoRef.current && monacoRef.current.editor && activeFile && file) {
+            try {
+                const content = file.cells?.[file.cellOrder[0]]?.content || "";
+                const language = extensionToLanguage(activeFile);
+                const model = getOrCreateFileModel(monacoRef.current, activeFile, content, language);
 
-            if (model && editorRef.current.getModel() !== model) {
-                editorRef.current.setModel(model);
+                if (model && editorRef.current.getModel() !== model) {
+                    editorRef.current.setModel(model);
+                }
+            } catch (error) {
+                console.warn("Failed to switch models on active file change:", error);
             }
         }
     }, [activeFile, file, getOrCreateFileModel]);
@@ -190,10 +234,19 @@ export default function SingleFileEditor() {
     // Cleanup models on unmount
     useEffect(() => {
         return () => {
+            // Clear Monaco references first to prevent theme changes
+            monacoRef.current = null;
+            editorRef.current = null;
+            diffEditorRef.current = null;
+
             // Dispose all models when component unmounts
-            modelsRef.current.forEach((model) => {
-                if (!model.isDisposed()) {
-                    model.dispose();
+            modelsRef.current.forEach((model, fileName) => {
+                try {
+                    if (model && !model.isDisposed()) {
+                        model.dispose();
+                    }
+                } catch (error) {
+                    console.warn(`Failed to dispose Monaco model for ${fileName}:`, error);
                 }
             });
             modelsRef.current.clear();
@@ -360,8 +413,12 @@ export default function SingleFileEditor() {
                     const model = getOrCreateFileModel(monaco, activeFile, content, language);
 
                     // Set the model to the editor
-                    if (model) {
-                        editor.setModel(model);
+                    if (model && !model.isDisposed()) {
+                        try {
+                            editor.setModel(model);
+                        } catch (error) {
+                            console.warn("Failed to set model to editor:", error);
+                        }
                     }
 
                     // Ensure font is properly applied
