@@ -462,6 +462,27 @@ export class Logger {
     muted: '#6b7280'       // gray-500
   }
 
+  private static getCallerInfo(): string {
+    const stack = new Error().stack
+    if (!stack) return ''
+
+    const lines = stack.split('\n')
+    // Skip the first few lines (Error, getCallerInfo, formatMessage, and the Logger method)
+    for (let i = 4; i < lines.length; i++) {
+      const line = lines[i]
+      if (line && !line.includes('Logger.') && !line.includes('formatMessage') && !line.includes('getCallerInfo')) {
+        // Extract file name and line number from stack trace
+        const match = line.match(/at\s+(?:.*\s+\()?(.+):(\d+):(\d+)\)?/)
+        if (match) {
+          const [, filePath, lineNum] = match
+          const fileName = filePath.split('/').pop() || filePath
+          return ` (${fileName}:${lineNum})`
+        }
+      }
+    }
+    return ''
+  }
+
   private static formatMessage(level: string, message: any, color: string): void {
     const timestamp = new Date().toLocaleTimeString('en-US', {
       hour12: false,
@@ -471,7 +492,8 @@ export class Logger {
       fractionalSecondDigits: 3
     })
 
-    const prefix = `%c[${timestamp}] ${level.toUpperCase()}`
+    const callerInfo = this.getCallerInfo()
+    const prefix = `%c[${timestamp}] ${level.toUpperCase()}${callerInfo}`
     const styles = `color: ${color}; font-weight: bold; font-family: 'DM Mono', monospace;`
 
     if (typeof message === 'object' && message !== null) {
@@ -517,8 +539,9 @@ export class Logger {
   }
 
   static input(label: string, data: any): void {
+    const callerInfo = this.getCallerInfo()
     console.groupCollapsed(
-      `%c📥 INPUT: ${label}`,
+      `%c📥 INPUT: ${label}${callerInfo}`,
       `color: ${this.colors.input}; font-weight: bold; font-family: 'DM Mono', monospace;`
     )
     if (typeof data === 'object' && data !== null) {
@@ -532,9 +555,10 @@ export class Logger {
   static output(label: string, data: any, isError: boolean = false): void {
     const color = isError ? this.colors.error : this.colors.output
     const icon = isError ? '❌' : '📤'
+    const callerInfo = this.getCallerInfo()
 
     console.groupCollapsed(
-      `%c${icon} OUTPUT: ${label}`,
+      `%c${icon} OUTPUT: ${label}${callerInfo}`,
       `color: ${color}; font-weight: bold; font-family: 'DM Mono', monospace;`
     )
 
@@ -574,8 +598,9 @@ export class Logger {
   static execution(operation: string, input: any, output: any, isError: boolean = false): void {
     const color = isError ? this.colors.error : this.colors.primary
     const icon = isError ? '💥' : '⚡'
+    const callerInfo = this.getCallerInfo()
 
-    this.groupCollapsed(`${icon} ${operation}`, color)
+    this.groupCollapsed(`${icon} ${operation}${callerInfo}`, color)
 
     // Input section
     console.groupCollapsed(

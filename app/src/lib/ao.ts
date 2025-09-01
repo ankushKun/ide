@@ -116,6 +116,8 @@ export class MainnetAO {
             'signing-format': 'ANS-104',
             module: module_ || Constants.modules.mainnet.hyperAos,
             scheduler: await this.operator(),
+            accept: 'application/json',
+            // 'accept-bundle': true,
             ...Constants.tags.common,
         }
 
@@ -178,6 +180,8 @@ export class MainnetAO {
                     resolve(process)
                 }
             })
+            setTimeout(() => slot(), 5000)
+            resolve(process)
             // }
             // catch (e) {
             //     console.error("Spawned but failed to initialize process:", e)
@@ -190,14 +194,17 @@ export class MainnetAO {
     async write({ processId, tags, data }: { processId: string, tags?: { name: string; value: string }[], data?: any }) {
 
         const params: any = {
-            path: `/${processId}~process@1.0/push/serialize~json@1.0`,
+            path: `/${processId}/push`,
             method: 'POST',
             type: 'Message',
             'data-protocol': 'ao',
             variant: 'ao.N.1',
             target: processId,
-            'signing-format': 'ANS-104',
             // 'signing-format': 'ans104',
+            'signing-format': 'ANS-104',
+            accept: 'application/json',
+            // 'accept-bundle': "true",
+            // 'signing-format': 'ANS-104',
         }
 
         // Add tags as properties
