@@ -87,6 +87,12 @@ const CodeCell: React.FC<CodeCellProps> = ({
     const monacoRef = useRef<typeof import("monaco-editor") | null>(null);
     const diffEditorRef = useRef<editor.IStandaloneDiffEditor | null>(null);
 
+    // Store model for this cell to maintain separate undo/redo history
+    const modelRef = useRef<editor.ITextModel | null>(null);
+
+    // Track component mounting state to prevent operations on unmounting components
+    const isMountedRef = useRef(true);
+
     const runCellCode = async () => {
         console.log("running cell code", cellId);
         setRunning(true);
@@ -123,6 +129,45 @@ const CodeCell: React.FC<CodeCellProps> = ({
         }
     }, [theme]);
 
+    // Helper function to get or create a model for this cell
+    const getOrCreateCellModel = useCallback((monaco: typeof import("monaco-editor"), content: string) => {
+        if (!isMountedRef.current) {
+            return null;
+        }
+
+        if (!modelRef.current) {
+            try {
+                // Create a unique URI for this cell
+                const uri = monaco.Uri.parse(`file:///notebook/${file.name || 'untitled'}/${cellId}.lua`);
+                modelRef.current = monaco.editor.createModel(content, "lua", uri);
+
+                // Listen for model changes to update the cell content
+                modelRef.current.onDidChangeContent(() => {
+                    if (isMountedRef.current && modelRef.current) {
+                        const updatedContent = modelRef.current.getValue();
+                        onUpdateCell(cellId, { code: updatedContent });
+                    }
+                });
+            } catch (error) {
+                console.error("Failed to create Monaco model for cell:", error);
+                return null;
+            }
+        } else {
+            // Update existing model content if it differs
+            try {
+                if (modelRef.current.getValue() !== content) {
+                    modelRef.current.setValue(content);
+                }
+            } catch (error) {
+                console.error("Failed to update Monaco model for cell:", error);
+                // Don't immediately clear the ref - let it be cleaned up later
+                return modelRef.current;
+            }
+        }
+
+        return modelRef.current;
+    }, [cellId, file.name, onUpdateCell]);
+
     // Add theme change listener for dynamic theme switching
     useEffect(() => {
         const handleStorageChange = (e: StorageEvent) => {
@@ -152,14 +197,32 @@ const CodeCell: React.FC<CodeCellProps> = ({
         }
     }, [theme, applyTheme]);
 
-    // Cleanup Monaco instances on unmount
+    // Cleanup Monaco instances and model on unmount
     useEffect(() => {
         return () => {
+            // Mark component as unmounted to prevent further operations
+            isMountedRef.current = false;
+
             if (monacoRef.current) {
                 unregisterMonacoInstance(monacoRef.current);
             }
             if (diffEditorRef.current) {
                 // DiffEditor uses the same Monaco instance, so no need to unregister twice
+            }
+            // Dispose the model when component unmounts
+            if (modelRef.current) {
+                const model = modelRef.current;
+                modelRef.current = null;
+                // Defer disposal to avoid race conditions
+                setTimeout(() => {
+                    try {
+                        if (!model.isDisposed()) {
+                            model.dispose();
+                        }
+                    } catch (error) {
+                        console.warn("Failed to dispose Monaco model for cell:", error);
+                    }
+                }, 100);
             }
         };
     }, [unregisterMonacoInstance]);
@@ -300,6 +363,18 @@ const CodeCell: React.FC<CodeCellProps> = ({
                                 registerMonacoInstance(monaco);
                                 applyTheme(monaco);
 
+                                // Create or get the model for this cell
+                                const model = getOrCreateCellModel(monaco, cell.code);
+
+                                // Set the model to the editor if valid and component is still mounted
+                                if (isMountedRef.current && model) {
+                                    try {
+                                        editor.setModel(model);
+                                    } catch (error) {
+                                        console.error("Failed to set Monaco model for cell:", error);
+                                    }
+                                }
+
                                 // Add command only to this particular cell
                                 editor.getContainerDomNode().addEventListener("keydown", async (e) => {
                                     if (e.shiftKey && e.key === "Enter" && !e.metaKey) {
@@ -327,17 +402,12 @@ const CodeCell: React.FC<CodeCellProps> = ({
                                     },
                                 });
                             }}
-                            onChange={(value) => {
-                                onUpdateCell(cellId, { code: value || "" });
-                            }}
                             height={
                                 expand ? Math.max(cell.code.split("\n").length * 20, 60) :
                                     (cell.code.split("\n").length > 15 ? 15 * 20 : Math.max((cell.code.split("\n").length) * 20, 60))
                             }
                             width="100%"
                             className="min-h-[60px] block py-0 font-btr-code overflow-y-clip"
-                            value={cell.code}
-                            defaultValue={cell.code}
                             language="lua"
                             options={monacoConfig}
                         />
@@ -392,6 +462,12 @@ const VisualCell: React.FC<VisualCellProps> = ({
     // Refs to store Monaco instances for theme updates
     const monacoRef = useRef<typeof import("monaco-editor") | null>(null);
 
+    // Store model for this cell to maintain separate undo/redo history
+    const modelRef = useRef<editor.ITextModel | null>(null);
+
+    // Track component mounting state to prevent operations on unmounting components
+    const isMountedRef = useRef(true);
+
     const applyTheme = useCallback((monaco: typeof import("monaco-editor")) => {
         const isDark = theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
         if (isDark) {
@@ -400,6 +476,45 @@ const VisualCell: React.FC<VisualCellProps> = ({
             monaco.editor.setTheme("vs-light");
         }
     }, [theme]);
+
+    // Helper function to get or create a model for this cell
+    const getOrCreateVisualCellModel = useCallback((monaco: typeof import("monaco-editor"), content: string, language: string) => {
+        if (!isMountedRef.current) {
+            return null;
+        }
+
+        if (!modelRef.current) {
+            try {
+                // Create a unique URI for this cell
+                const uri = monaco.Uri.parse(`file:///notebook/${file.name || 'untitled'}/${cellId}.${language}`);
+                modelRef.current = monaco.editor.createModel(content, language, uri);
+
+                // Listen for model changes to update the cell content
+                modelRef.current.onDidChangeContent(() => {
+                    if (isMountedRef.current && modelRef.current) {
+                        const updatedContent = modelRef.current.getValue();
+                        onUpdateCell(cellId, { code: updatedContent });
+                    }
+                });
+            } catch (error) {
+                console.error("Failed to create Monaco model for visual cell:", error);
+                return null;
+            }
+        } else {
+            // Update existing model content if it differs
+            try {
+                if (modelRef.current.getValue() !== content) {
+                    modelRef.current.setValue(content);
+                }
+            } catch (error) {
+                console.error("Failed to update Monaco model for visual cell:", error);
+                // Don't immediately clear the ref - let it be cleaned up later
+                return modelRef.current;
+            }
+        }
+
+        return modelRef.current;
+    }, [cellId, file.name, onUpdateCell]);
 
     // Add theme change listener for dynamic theme switching
     useEffect(() => {
@@ -430,11 +545,29 @@ const VisualCell: React.FC<VisualCellProps> = ({
         }
     }, [theme, applyTheme]);
 
-    // Cleanup Monaco instances on unmount
+    // Cleanup Monaco instances and model on unmount
     useEffect(() => {
         return () => {
+            // Mark component as unmounted to prevent further operations
+            isMountedRef.current = false;
+
             if (monacoRef.current) {
                 unregisterMonacoInstance(monacoRef.current);
+            }
+            // Dispose the model when component unmounts
+            if (modelRef.current) {
+                const model = modelRef.current;
+                modelRef.current = null;
+                // Defer disposal to avoid race conditions
+                setTimeout(() => {
+                    try {
+                        if (!model.isDisposed()) {
+                            model.dispose();
+                        }
+                    } catch (error) {
+                        console.warn("Failed to dispose Monaco model for cell:", error);
+                    }
+                }, 100);
             }
         };
     }, [unregisterMonacoInstance]);
@@ -506,14 +639,24 @@ const VisualCell: React.FC<VisualCellProps> = ({
                             registerMonacoInstance(monaco);
                             applyTheme(monaco);
 
+                            // Create or get the model for this cell
+                            const language = cell.type === "MARKDOWN" ? "markdown" : "latex";
+                            const model = getOrCreateVisualCellModel(monaco, cell.code, language);
+
+                            // Set the model to the editor if valid and component is still mounted
+                            if (isMountedRef.current && model) {
+                                try {
+                                    editor.setModel(model);
+                                } catch (error) {
+                                    console.error("Failed to set Monaco model for visual cell:", error);
+                                }
+                            }
+
                             editor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.Enter, () => {
                                 setEditing(false);
                                 onUpdateCell(cellId, { editing: false });
                             });
                             editor.focus();
-                        }}
-                        onChange={(value) => {
-                            onUpdateCell(cellId, { code: value || "" });
                         }}
                         height={
                             expand ? Math.max(cell.code.split("\n").length * 20, 60) :
@@ -521,8 +664,6 @@ const VisualCell: React.FC<VisualCellProps> = ({
                         }
                         width="100%"
                         className="min-h-[60px] block font-btr-code overflow-y-clip !rounded-sm"
-                        value={cell.code}
-                        defaultValue={cell.code}
                         language={cell.type === "MARKDOWN" ? "markdown" : "latex"}
                         options={monacoConfig}
                     />

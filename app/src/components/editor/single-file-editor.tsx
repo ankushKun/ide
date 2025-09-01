@@ -67,6 +67,58 @@ export default function SingleFileEditor() {
     const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
     const diffEditorRef = useRef<editor.IStandaloneDiffEditor | null>(null);
 
+    // Store models for each file to maintain separate undo/redo history
+    const modelsRef = useRef<Map<string, editor.ITextModel>>(new Map());
+
+    // Helper function to get or create a model for a file
+    const getOrCreateFileModel = useCallback((monaco: typeof import("monaco-editor"), fileName: string, content: string, language: string) => {
+        let model = modelsRef.current.get(fileName);
+
+        if (!model) {
+            // Create a unique URI for this file
+            const uri = monaco.Uri.parse(`file:///${activeProject}/${fileName}`);
+            model = monaco.editor.createModel(content, language, uri);
+            modelsRef.current.set(fileName, model);
+
+            // Listen for model changes to update the file content
+            model.onDidChangeContent(() => {
+                if (fileName === activeFile && file && project) {
+                    const updatedContent = model?.getValue() || "";
+                    const firstCellId = file.cellOrder[0];
+
+                    // Ensure cells object exists and has the cell
+                    const cells = file.cells || {};
+                    const currentCell = cells[firstCellId] || {
+                        id: firstCellId,
+                        content: "",
+                        output: "",
+                        type: "CODE" as const,
+                        editing: false
+                    };
+
+                    const updatedFile = {
+                        ...file,
+                        cells: {
+                            ...cells,
+                            [firstCellId]: {
+                                ...currentCell,
+                                content: updatedContent
+                            }
+                        }
+                    };
+                    useProjects.getState().actions.setFile(activeProject, updatedFile);
+                }
+            });
+        } else {
+            // Update existing model content if it differs
+            if (model.getValue() !== content) {
+                model.setValue(content);
+            }
+        }
+
+        return model;
+    }, [activeProject, activeFile, file, project]);
+
     // Helper function to apply theme
     const applyTheme = useCallback((monaco: typeof import("monaco-editor")) => {
         const isDark = theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
@@ -121,6 +173,32 @@ export default function SingleFileEditor() {
             applyTheme(monacoRef.current);
         }
     }, [theme, applyTheme])
+
+    // Handle active file changes - switch models
+    useEffect(() => {
+        if (editorRef.current && monacoRef.current && activeFile && file) {
+            const content = file.cells?.[file.cellOrder[0]]?.content || "";
+            const language = extensionToLanguage(activeFile);
+            const model = getOrCreateFileModel(monacoRef.current, activeFile, content, language);
+
+            if (model && editorRef.current.getModel() !== model) {
+                editorRef.current.setModel(model);
+            }
+        }
+    }, [activeFile, file, getOrCreateFileModel]);
+
+    // Cleanup models on unmount
+    useEffect(() => {
+        return () => {
+            // Dispose all models when component unmounts
+            modelsRef.current.forEach((model) => {
+                if (!model.isDisposed()) {
+                    model.dispose();
+                }
+            });
+            modelsRef.current.clear();
+        };
+    }, []);
 
     if (!file || !activeFile) {
         return (
@@ -277,6 +355,15 @@ export default function SingleFileEditor() {
                     // Apply theme using helper function
                     applyTheme(monaco);
 
+                    // Get or create model for this file
+                    const content = file.cells?.[file.cellOrder[0]]?.content || "";
+                    const model = getOrCreateFileModel(monaco, activeFile, content, language);
+
+                    // Set the model to the editor
+                    if (model) {
+                        editor.setModel(model);
+                    }
+
                     // Ensure font is properly applied
                     editor.updateOptions({
                         fontFamily: '"DM Mono", monospace',
@@ -339,34 +426,6 @@ export default function SingleFileEditor() {
                             }
                         },
                     })
-                }}
-                value={file.cells?.[file.cellOrder[0]]?.content || ""}
-                onChange={(value) => {
-                    if (value !== undefined && project) {
-                        const firstCellId = file.cellOrder[0];
-
-                        // Ensure cells object exists and has the cell
-                        const cells = file.cells || {};
-                        const currentCell = cells[firstCellId] || {
-                            id: firstCellId,
-                            content: "",
-                            output: "",
-                            type: "CODE" as const,
-                            editing: false
-                        };
-
-                        const updatedFile = {
-                            ...file,
-                            cells: {
-                                ...cells,
-                                [firstCellId]: {
-                                    ...currentCell,
-                                    content: value
-                                }
-                            }
-                        };
-                        useProjects.getState().actions.setFile(activeProject, updatedFile);
-                    }
                 }}
                 language={language}
                 options={monacoConfig}
