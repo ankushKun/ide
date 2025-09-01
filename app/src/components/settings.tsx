@@ -708,7 +708,7 @@ export default function Settings() {
                                 <CardContent className="space-y-4">
                                     <div className="flex items-center justify-between">
                                         <div className="space-y-1">
-                                            <Label htmlFor="vim-mode" className="text-sm font-medium">VIM Mode</Label>
+                                            <Label htmlFor="vim-mode" className="text-sm font-medium">VIM Mode (buggy, help needed, not recommended)</Label>
                                             <div className="text-xs text-muted-foreground">
                                                 Enable VIM keybindings in the editor
                                             </div>

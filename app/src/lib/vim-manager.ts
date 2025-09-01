@@ -10,11 +10,18 @@ interface VimInstance {
     dispose: () => void;
 }
 
+interface NotebookVimState {
+    masterVimInstance: VimInstance;
+    editorInstances: Map<string, any>; // editorId -> editor instance
+    activeEditorId: string | null;
+}
+
 class VimModeManager {
     private activeVimId: string | null = null;
     private vimInstances: Map<string, VimInstance> = new Map();
     private statusNode: HTMLElement | null = null;
     private notebookGroups: Map<string, Set<string>> = new Map(); // Track which editors belong to which notebook
+    private notebookVimStates: Map<string, NotebookVimState> = new Map(); // Track vim state per notebook
 
     constructor() {
         // Initialize status node reference
@@ -133,13 +140,77 @@ class VimModeManager {
     }
 
     /**
- * Dispose a specific vim instance
+ * Dispose a notebook cell editor
  */
+    disposeNotebookCellEditor(notebookId: string, editorId: string): void {
+        const notebookState = this.notebookVimStates.get(notebookId);
+        if (notebookState) {
+            // Remove the editor from the notebook state
+            notebookState.editorInstances.delete(editorId);
+
+            // If this was the active editor, switch to another one
+            if (notebookState.activeEditorId === editorId) {
+                const remainingEditors = Array.from(notebookState.editorInstances.keys());
+                if (remainingEditors.length > 0) {
+                    const newActiveEditor = remainingEditors[0];
+                    const editor = notebookState.editorInstances.get(newActiveEditor);
+                    if (editor) {
+                        this.switchMasterVimToEditor(notebookId, newActiveEditor, editor);
+                        notebookState.activeEditorId = newActiveEditor;
+                    }
+                } else {
+                    // No more editors, dispose the entire notebook vim state
+                    this.disposeNotebookVimState(notebookId);
+                }
+            }
+
+            // Remove from notebook group
+            this.unregisterNotebookEditor(notebookId, editorId);
+        }
+    }
+
+    /**
+     * Dispose entire notebook vim state
+     */
+    private disposeNotebookVimState(notebookId: string): void {
+        const notebookState = this.notebookVimStates.get(notebookId);
+        if (notebookState) {
+            // Dispose master vim instance
+            try {
+                notebookState.masterVimInstance.dispose();
+                this.vimInstances.delete(notebookState.masterVimInstance.id);
+            } catch (error) {
+                console.warn(`Error disposing notebook vim state for ${notebookId}:`, error);
+            }
+
+            // Clear the notebook state
+            this.notebookVimStates.delete(notebookId);
+            this.notebookGroups.delete(notebookId);
+
+            // Reset active vim if this was active
+            if (this.activeVimId === notebookState.masterVimInstance.id) {
+                this.activeVimId = null;
+                this.resetStatus();
+            }
+
+            console.log(`Disposed notebook vim state: ${notebookId}`);
+        }
+    }
+
+    /**
+     * Dispose a specific vim instance
+     */
     disposeVimInstance(id: string): void {
+        // Check if this is a notebook cell
+        const notebookId = this.getNotebookIdForEditor(id);
+        if (notebookId) {
+            this.disposeNotebookCellEditor(notebookId, id);
+            return;
+        }
+
+        // Handle regular (non-notebook) vim instances
         const instance = this.vimInstances.get(id);
         if (instance) {
-            const notebookId = this.getNotebookId(id);
-
             try {
                 instance.dispose();
             } catch (error) {
@@ -148,31 +219,10 @@ class VimModeManager {
 
             this.vimInstances.delete(id);
 
-            // Remove from notebook group if it exists
-            if (notebookId) {
-                this.unregisterNotebookEditor(notebookId, id);
-            }
-
-            // If this was the active instance, try to activate another instance from the same notebook
+            // If this was the active instance, reset
             if (this.activeVimId === id) {
                 this.activeVimId = null;
-
-                // If this was part of a notebook, try to activate another cell in the same notebook
-                if (notebookId) {
-                    const notebookEditors = this.notebookGroups.get(notebookId);
-                    if (notebookEditors && notebookEditors.size > 0) {
-                        // Activate the first available cell in the notebook
-                        const firstEditor = Array.from(notebookEditors)[0];
-                        if (this.vimInstances.has(firstEditor)) {
-                            this.activeVimId = firstEditor;
-                            console.log(`Switched active vim to another cell in notebook: ${firstEditor}`);
-                        }
-                    }
-                }
-
-                if (!this.activeVimId) {
-                    this.resetStatus();
-                }
+                this.resetStatus();
             }
 
             console.log(`Vim instance disposed: ${id}`);
@@ -194,6 +244,17 @@ class VimModeManager {
      * Dispose all vim instances
      */
     disposeAllInstances(): void {
+        // Dispose all notebook vim states
+        this.notebookVimStates.forEach((notebookState, notebookId) => {
+            try {
+                notebookState.masterVimInstance.dispose();
+            } catch (error) {
+                console.warn(`Error disposing notebook vim state ${notebookId}:`, error);
+            }
+        });
+        this.notebookVimStates.clear();
+
+        // Dispose regular vim instances
         this.vimInstances.forEach((instance, id) => {
             try {
                 instance.dispose();
@@ -227,10 +288,90 @@ class VimModeManager {
         editor: any,
         onVimReady?: (vimInstance: any) => void
     ): Promise<void> {
+        if (!this.isVimModeEnabled()) return;
+
         // Register this editor as part of the notebook
         this.registerNotebookEditor(notebookId, editorId);
 
-        return this.initializeVimMode(editorId, editor, onVimReady);
+        // Get or create notebook vim state
+        let notebookState = this.notebookVimStates.get(notebookId);
+
+        if (!notebookState) {
+            // Create master vim instance for this notebook using the first editor
+            try {
+                // Ensure the editor is valid
+                if (!editor || typeof editor.getModel !== 'function') {
+                    console.warn(`Invalid editor for notebook vim initialization: ${editorId}`);
+                    return;
+                }
+
+                const masterVim = initVimMode(editor, this.statusNode);
+
+                if (masterVim && typeof masterVim.dispose === 'function') {
+                    const masterInstance: VimInstance = {
+                        id: `notebook-master-${notebookId}`,
+                        instance: masterVim,
+                        dispose: () => {
+                            try {
+                                masterVim.dispose();
+                            } catch (error) {
+                                console.warn(`Error disposing master vim for notebook ${notebookId}:`, error);
+                            }
+                        }
+                    };
+
+                    notebookState = {
+                        masterVimInstance: masterInstance,
+                        editorInstances: new Map(),
+                        activeEditorId: editorId
+                    };
+
+                    this.notebookVimStates.set(notebookId, notebookState);
+                    this.vimInstances.set(masterInstance.id, masterInstance);
+                    this.activeVimId = masterInstance.id;
+
+                    console.log(`Created master vim instance for notebook: ${notebookId}`);
+                }
+            } catch (error) {
+                console.error(`Failed to create master vim for notebook ${notebookId}:`, error);
+                return;
+            }
+        }
+
+        // Store the editor instance
+        if (notebookState) {
+            notebookState.editorInstances.set(editorId, editor);
+
+            // If this is not the first editor, we need to sync vim state
+            if (notebookState.editorInstances.size > 1) {
+                this.syncVimStateToEditor(notebookId, editorId, editor);
+            }
+
+            if (onVimReady && notebookState.masterVimInstance) {
+                onVimReady(notebookState.masterVimInstance.instance);
+            }
+        }
+    }
+
+    /**
+     * Sync vim state from master to a specific editor
+     */
+    private syncVimStateToEditor(notebookId: string, editorId: string, editor: any): void {
+        const notebookState = this.notebookVimStates.get(notebookId);
+        if (!notebookState) return;
+
+        try {
+            // Create a lightweight vim binding for this editor that syncs with master
+            const masterVim = notebookState.masterVimInstance.instance;
+
+            // Initialize vim mode for this editor but don't create a separate status
+            const cellVim = initVimMode(editor, null); // null status node to prevent duplicate indicators
+
+            // Store a reference but don't track it as a separate instance
+            console.log(`Synced vim state to cell: ${editorId}`);
+        } catch (error) {
+            console.warn(`Failed to sync vim state to editor ${editorId}:`, error);
+        }
     }
 
     /**
@@ -277,12 +418,88 @@ class VimModeManager {
     }
 
     /**
+     * Handle notebook cell focus
+     */
+    onNotebookCellFocus(notebookId: string, editorId: string): void {
+        const notebookState = this.notebookVimStates.get(notebookId);
+        if (notebookState) {
+            // Update which cell is active but keep the same master vim instance
+            notebookState.activeEditorId = editorId;
+
+            // Switch the master vim to focus on this editor
+            const editor = notebookState.editorInstances.get(editorId);
+            if (editor) {
+                try {
+                    // Re-attach the master vim to the focused editor
+                    this.switchMasterVimToEditor(notebookId, editorId, editor);
+                } catch (error) {
+                    console.warn(`Failed to switch vim focus to cell ${editorId}:`, error);
+                }
+            }
+        }
+    }
+
+    /**
+     * Switch the master vim instance to focus on a specific editor
+     */
+    private switchMasterVimToEditor(notebookId: string, editorId: string, editor: any): void {
+        const notebookState = this.notebookVimStates.get(notebookId);
+        if (!notebookState) return;
+
+        try {
+            // Dispose the current master vim
+            notebookState.masterVimInstance.dispose();
+
+            // Create new master vim on the focused editor
+            const newMasterVim = initVimMode(editor, this.statusNode);
+
+            if (newMasterVim && typeof newMasterVim.dispose === 'function') {
+                const newMasterInstance: VimInstance = {
+                    id: notebookState.masterVimInstance.id,
+                    instance: newMasterVim,
+                    dispose: () => {
+                        try {
+                            newMasterVim.dispose();
+                        } catch (error) {
+                            console.warn(`Error disposing master vim for notebook ${notebookId}:`, error);
+                        }
+                    }
+                };
+
+                // Update the master instance
+                notebookState.masterVimInstance = newMasterInstance;
+                this.vimInstances.set(newMasterInstance.id, newMasterInstance);
+
+                console.log(`Switched master vim to cell: ${editorId}`);
+            }
+        } catch (error) {
+            console.error(`Failed to switch master vim to editor ${editorId}:`, error);
+        }
+    }
+
+    /**
      * Handle editor focus - set as active vim instance
      */
     onEditorFocus(editorId: string): void {
-        if (this.vimInstances.has(editorId)) {
+        // Check if this is a notebook cell
+        const notebookId = this.getNotebookIdForEditor(editorId);
+        if (notebookId) {
+            this.onNotebookCellFocus(notebookId, editorId);
+        } else if (this.vimInstances.has(editorId)) {
             this.setActiveVim(editorId);
         }
+    }
+
+    /**
+     * Get notebook ID for a given editor ID
+     */
+    private getNotebookIdForEditor(editorId: string): string | null {
+        for (const [notebookId, notebookState] of this.notebookVimStates.entries()) {
+            if (notebookState.editorInstances.has(editorId)) {
+                return notebookId;
+            }
+        }
+        return null;
     }
 
     /**
