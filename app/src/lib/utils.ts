@@ -258,15 +258,10 @@ export function isErrorText(text: string): boolean {
  * @returns true if the result indicates an error, false otherwise
  */
 export function isExecutionError(result: any): boolean {
-  // Check status field first
-  if (result?.status === "error" || !!result?.error) {
+  console.log("isExecutionError", result)
+  // Only check status field and error field, not content
+  if (result?.status === "error" || !!result?.error || result.status != 200) {
     return true;
-  }
-
-  // Check output content for error patterns, even if status is "ok"
-  const outputData = result?.output?.data;
-  if (outputData && typeof outputData === 'string') {
-    return isErrorText(outputData);
   }
 
   return false;
