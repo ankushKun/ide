@@ -943,7 +943,7 @@ export default function Settings() {
                                                                         >
                                                                             <Edit3 className="h-3 w-3" />
                                                                         </Button>
-                                                                        <p className="text-sm font-btr-code text-foreground/80 truncate max-w-[200px]">
+                                                                        <p className="text-sm font-btr-code text-foreground/80 break-all">
                                                                             {file.process ? (
                                                                                 file.process
                                                                             ) : (

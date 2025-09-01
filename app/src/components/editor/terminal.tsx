@@ -289,60 +289,7 @@ export default function Terminal() {
         xterm.loadAddon(webLinksAddon)
         xterm.loadAddon(readline)
 
-        // Add keyboard handler for Ctrl+L
-        xterm.onKey(({ key, domEvent }) => {
-            if (domEvent.ctrlKey && (domEvent.key === 'l' || domEvent.key === 'L')) {
-                domEvent.preventDefault()
-                domEvent.stopPropagation()
 
-                if (!project?.process || !xtermRef.current) return false
-
-                // Clear history for this project when user presses Ctrl+L
-                if (activeProjectId) {
-                    clearProjectHistory(activeProjectId)
-                }
-
-                // Update prompt first to reflect current active file
-                updatePrompt()
-
-                // Show initial state (without history since we just cleared it)
-                showInitialTerminalState(false)
-
-                // Show the current prompt in the terminal so user knows where to type
-                xtermRef.current.write(ANSI.RESET + window.xtermPrompt)
-                return false
-            }
-        })
-
-        // Also add a global keydown listener to catch Ctrl+L before it reaches the browser
-        const handleGlobalKeyDown = (event: KeyboardEvent) => {
-            if (event.ctrlKey && (event.key === 'l' || event.key === 'L')) {
-                // Only handle if the terminal is focused or if we're in the terminal container
-                const terminalContainer = terminalRef.current
-                if (terminalContainer && (document.activeElement === terminalContainer || terminalContainer.contains(document.activeElement))) {
-                    event.preventDefault()
-                    event.stopPropagation()
-
-                    if (!project?.process || !xtermRef.current) return
-
-                    // Clear history for this project when user presses Ctrl+L
-                    if (activeProjectId) {
-                        clearProjectHistory(activeProjectId)
-                    }
-
-                    // Update prompt first to reflect current active file
-                    updatePrompt()
-
-                    // Show initial state (without history since we just cleared it)
-                    showInitialTerminalState(false)
-
-                    // Show the current prompt in the terminal so user knows where to type
-                    xtermRef.current.write(ANSI.RESET + window.xtermPrompt)
-                }
-            }
-        }
-
-        document.addEventListener('keydown', handleGlobalKeyDown, true)
 
         // Open terminal
         xterm.open(terminalRef.current)
@@ -443,8 +390,7 @@ export default function Terminal() {
                 spinnerIntervalRef.current = null
             }
 
-            // Remove global keydown listener
-            document.removeEventListener('keydown', handleGlobalKeyDown, true)
+
 
             xterm.dispose()
             xtermRef.current = null
@@ -455,6 +401,71 @@ export default function Terminal() {
             window.removeEventListener("log-output", logOutput)
         }
     }, [theme])
+
+    useEffect(() => {
+        if (!isReady || !xtermRef.current) return
+
+        // Add keyboard handler for Ctrl+L
+        const keyHandler = xtermRef.current.onKey(({ key, domEvent }) => {
+            if (domEvent.ctrlKey && (domEvent.key === 'l' || domEvent.key === 'L')) {
+                domEvent.preventDefault()
+                domEvent.stopPropagation()
+
+                if (!project?.process || !xtermRef.current) return false
+
+                // Clear history for this project when user presses Ctrl+L
+                if (activeProjectId) {
+                    clearProjectHistory(activeProjectId)
+                }
+
+                // Update prompt first to reflect current active file
+                updatePrompt()
+
+                // Show initial state (without history since we just cleared it)
+                showInitialTerminalState(false)
+
+                // Show the current prompt in the terminal so user knows where to type
+                xtermRef.current.write(ANSI.RESET + window.xtermPrompt)
+                return false
+            }
+        })
+
+        // Also add a global keydown listener to catch Ctrl+L before it reaches the browser
+        const handleGlobalKeyDown = (event: KeyboardEvent) => {
+            if (event.ctrlKey && (event.key === 'l' || event.key === 'L')) {
+                // Only handle if the terminal is focused or if we're in the terminal container
+                const terminalContainer = terminalRef.current
+                if (terminalContainer && (document.activeElement === terminalContainer || terminalContainer.contains(document.activeElement))) {
+                    event.preventDefault()
+                    event.stopPropagation()
+
+                    if (!project?.process || !xtermRef.current) return
+
+                    // Clear history for this project when user presses Ctrl+L
+                    if (activeProjectId) {
+                        clearProjectHistory(activeProjectId)
+                    }
+
+                    // Update prompt first to reflect current active file
+                    updatePrompt()
+
+                    // Show initial state (without history since we just cleared it)
+                    showInitialTerminalState(false)
+
+                    // Show the current prompt in the terminal so user knows where to type
+                    xtermRef.current.write(ANSI.RESET + window.xtermPrompt)
+                }
+            }
+        }
+
+        document.addEventListener('keydown', handleGlobalKeyDown, true)
+
+        // Cleanup function
+        return () => {
+            keyHandler.dispose()
+            document.removeEventListener('keydown', handleGlobalKeyDown, true)
+        }
+    }, [isReady, project, activeProjectId, clearProjectHistory, updatePrompt, showInitialTerminalState])
 
     // Fit terminal to container with debouncing
     const fitTerminal = useCallback(() => {
