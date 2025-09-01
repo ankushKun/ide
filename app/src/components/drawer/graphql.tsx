@@ -20,7 +20,8 @@ import {
     Database,
     ChevronDown,
     ChevronRight,
-    Filter
+    Filter,
+    KeyIcon
 } from "lucide-react"
 import JsonViewer from "../ui/json-viewer"
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
@@ -71,6 +72,20 @@ const GraphQL = memo(function GraphQL() {
     const [filters, setFilters] = useState<QueryFilters>({
         first: 10,
         sort: 'HEIGHT_DESC'
+    })
+
+    // Active filter toggles
+    const [activeFilters, setActiveFilters] = useState<{ [key: string]: boolean }>({
+        limit: false,
+        order: false,
+        cursor: false,
+        txIds: true,
+        owners: true,
+        recipients: false,
+        bundleIds: false,
+        blockHeight: false,
+        timestamp: false,
+        tags: true
     })
 
     // Raw input values for comma-separated fields (to preserve user typing)
@@ -270,6 +285,14 @@ ${fieldsString}
         }))
     }
 
+    // Toggle filter activation
+    const toggleFilter = (filterKey: string) => {
+        setActiveFilters(prev => ({
+            ...prev,
+            [filterKey]: !prev[filterKey]
+        }))
+    }
+
     // Execute GraphQL query
     const executeQuery = async () => {
         if (!generatedQuery.trim()) return
@@ -370,13 +393,25 @@ ${fieldsString}
             recipients: '',
             bundledIn: ''
         })
+        setActiveFilters({
+            limit: true,
+            order: true,
+            cursor: false,
+            txIds: false,
+            owners: false,
+            recipients: false,
+            bundleIds: false,
+            blockHeight: false,
+            timestamp: false,
+            tags: false
+        })
         setOutput(null)
         handleQueryTypeChange('transactions')
     }
 
     // Field checkbox component
     const FieldCheckbox = ({ label, path, checked }: { label: string; path: string[]; checked: boolean }) => (
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-2 ml-2.5">
             <Checkbox
                 id={path.join('.')}
                 checked={checked}
@@ -469,58 +504,150 @@ ${fieldsString}
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="px-0 pb-0 space-y-3">
-                                {/* Basic Filters */}
-                                <div className="flex gap-3">
-                                    <div className="space-y-1 w-full">
-                                        <Label className="text-xs">Limit</Label>
-                                        <Input
-                                            type="number"
-                                            placeholder="10"
-                                            value={filters.first || ""}
-                                            onChange={(e) => setFilters(prev => ({ ...prev, first: parseInt(e.target.value) || undefined }))}
-                                            className="text-xs"
-                                        />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <Label className="text-xs">Sort Order</Label>
-                                        <Select value={filters.sort || 'HEIGHT_DESC'} onValueChange={(value: any) => setFilters(prev => ({ ...prev, sort: value }))}>
-                                            <SelectTrigger className="text-xs">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="HEIGHT_DESC">Height ↓ (Newest)</SelectItem>
-                                                <SelectItem value="HEIGHT_ASC">Height ↑ (Oldest)</SelectItem>
-                                                <SelectItem value="INGESTED_AT_DESC">Ingested ↓ (Recent)</SelectItem>
-                                                <SelectItem value="INGESTED_AT_ASC">Ingested ↑ (Oldest)</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
+                                <div className="flex flex-wrap gap-1">
+                                    <Badge
+                                        className={`text-xs cursor-pointer transition-colors ${activeFilters.limit
+                                            ? 'bg-primary text-primary-foreground hover:bg-primary/80'
+                                            : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                                            }`}
+                                        onClick={() => toggleFilter('limit')}
+                                    >
+                                        limit
+                                    </Badge>
+                                    <Badge
+                                        className={`text-xs cursor-pointer transition-colors ${activeFilters.order
+                                            ? 'bg-primary text-primary-foreground hover:bg-primary/80'
+                                            : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                                            }`}
+                                        onClick={() => toggleFilter('order')}
+                                    >
+                                        order
+                                    </Badge>
+                                    <Badge
+                                        className={`text-xs cursor-pointer transition-colors ${activeFilters.cursor
+                                            ? 'bg-primary text-primary-foreground hover:bg-primary/80'
+                                            : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                                            }`}
+                                        onClick={() => toggleFilter('cursor')}
+                                    >
+                                        cursor
+                                    </Badge>
+                                    <Badge
+                                        className={`text-xs cursor-pointer transition-colors ${activeFilters.txIds
+                                            ? 'bg-primary text-primary-foreground hover:bg-primary/80'
+                                            : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                                            }`}
+                                        onClick={() => toggleFilter('txIds')}
+                                    >
+                                        tx ids
+                                    </Badge>
+                                    <Badge
+                                        className={`text-xs cursor-pointer transition-colors ${activeFilters.owners
+                                            ? 'bg-primary text-primary-foreground hover:bg-primary/80'
+                                            : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                                            }`}
+                                        onClick={() => toggleFilter('owners')}
+                                    >
+                                        owners
+                                    </Badge>
+                                    <Badge
+                                        className={`text-xs cursor-pointer transition-colors ${activeFilters.recipients
+                                            ? 'bg-primary text-primary-foreground hover:bg-primary/80'
+                                            : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                                            }`}
+                                        onClick={() => toggleFilter('recipients')}
+                                    >
+                                        recipients
+                                    </Badge>
+                                    <Badge
+                                        className={`text-xs cursor-pointer transition-colors ${activeFilters.bundleIds
+                                            ? 'bg-primary text-primary-foreground hover:bg-primary/80'
+                                            : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                                            }`}
+                                        onClick={() => toggleFilter('bundleIds')}
+                                    >
+                                        bundle ids
+                                    </Badge>
+                                    <Badge
+                                        className={`text-xs cursor-pointer transition-colors ${activeFilters.blockHeight
+                                            ? 'bg-primary text-primary-foreground hover:bg-primary/80'
+                                            : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                                            }`}
+                                        onClick={() => toggleFilter('blockHeight')}
+                                    >
+                                        block height
+                                    </Badge>
+                                    <Badge
+                                        className={`text-xs cursor-pointer transition-colors ${activeFilters.timestamp
+                                            ? 'bg-primary text-primary-foreground hover:bg-primary/80'
+                                            : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                                            }`}
+                                        onClick={() => toggleFilter('timestamp')}
+                                    >
+                                        timestamp
+                                    </Badge>
+                                    <Badge
+                                        className={`text-xs cursor-pointer transition-colors ${activeFilters.tags
+                                            ? 'bg-primary text-primary-foreground hover:bg-primary/80'
+                                            : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                                            }`}
+                                        onClick={() => toggleFilter('tags')}
+                                    >
+                                        tags
+                                    </Badge>
                                 </div>
 
-                                <div className="space-y-1">
-                                    <Label className="text-xs">After Cursor</Label>
-                                    <Input
-                                        placeholder="cursor..."
-                                        value={filters.after || ""}
-                                        onChange={(e) => setFilters(prev => ({ ...prev, after: e.target.value || undefined }))}
-                                        className="text-xs font-mono"
-                                    />
-                                </div>
+                                {/* Active Filter Inputs */}
+                                <div className="space-y-3">
+                                    {/* Basic Filters */}
+                                    {(activeFilters.limit || activeFilters.order) && (
+                                        <div className="flex gap-3">
+                                            {activeFilters.limit && (
+                                                <div className="space-y-1 w-full">
+                                                    <Label className="text-xs">Limit</Label>
+                                                    <Input
+                                                        type="number"
+                                                        placeholder="10"
+                                                        min="1"
+                                                        max="100"
+                                                        value={filters.first || ""}
+                                                        onChange={(e) => setFilters(prev => ({ ...prev, first: parseInt(e.target.value) || undefined }))}
+                                                        className="text-xs"
+                                                    />
+                                                </div>
+                                            )}
+                                            {activeFilters.order && (
+                                                <div className="space-y-1">
+                                                    <Label className="text-xs">Sort Order</Label>
+                                                    <Select value={filters.sort || 'HEIGHT_DESC'} onValueChange={(value: any) => setFilters(prev => ({ ...prev, sort: value }))}>
+                                                        <SelectTrigger className="text-xs">
+                                                            <SelectValue />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="HEIGHT_DESC">Height ↓ (Newest)</SelectItem>
+                                                            <SelectItem value="HEIGHT_ASC">Height ↑ (Oldest)</SelectItem>
+                                                            <SelectItem value="INGESTED_AT_DESC">Ingested ↓ (Recent)</SelectItem>
+                                                            <SelectItem value="INGESTED_AT_ASC">Ingested ↑ (Oldest)</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
 
-                                {/* Advanced Filters Toggle */}
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-auto p-1 justify-start w-full"
-                                    onClick={() => toggleSection('advancedFilters')}
-                                >
-                                    {expandedSections.advancedFilters ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                                    <span className="text-sm ml-1">Advanced Filters</span>
-                                </Button>
+                                    {activeFilters.cursor && (
+                                        <div className="space-y-1">
+                                            <Label className="text-xs">After Cursor</Label>
+                                            <Input
+                                                placeholder="cursor..."
+                                                value={filters.after || ""}
+                                                onChange={(e) => setFilters(prev => ({ ...prev, after: e.target.value || undefined }))}
+                                                className="text-xs font-mono"
+                                            />
+                                        </div>
+                                    )}
 
-                                {expandedSections.advancedFilters && (
-                                    <div className="space-y-3 border-l border-border pl-3">
-                                        {/* IDs Filter */}
+                                    {activeFilters.txIds && (
                                         <div className="space-y-1">
                                             <Label className="text-xs">Transaction IDs</Label>
                                             <Input
@@ -533,8 +660,9 @@ ${fieldsString}
                                                 className="text-xs font-mono"
                                             />
                                         </div>
+                                    )}
 
-                                        {/* Owners Filter */}
+                                    {activeFilters.owners && (
                                         <div className="space-y-1">
                                             <Label className="text-xs">Owner Addresses</Label>
                                             <Input
@@ -547,8 +675,9 @@ ${fieldsString}
                                                 className="text-xs font-mono"
                                             />
                                         </div>
+                                    )}
 
-                                        {/* Recipients Filter */}
+                                    {activeFilters.recipients && (
                                         <div className="space-y-1">
                                             <Label className="text-xs">Recipient Addresses</Label>
                                             <Input
@@ -561,8 +690,9 @@ ${fieldsString}
                                                 className="text-xs font-mono"
                                             />
                                         </div>
+                                    )}
 
-                                        {/* Bundle IDs Filter */}
+                                    {activeFilters.bundleIds && (
                                         <div className="space-y-1">
                                             <Label className="text-xs">Bundle IDs</Label>
                                             <Input
@@ -575,8 +705,9 @@ ${fieldsString}
                                                 className="text-xs font-mono"
                                             />
                                         </div>
+                                    )}
 
-                                        {/* Block Height Range */}
+                                    {activeFilters.blockHeight && (
                                         <div className="space-y-1">
                                             <Label className="text-xs">Block Height Range</Label>
                                             <div className="grid grid-cols-2 gap-2">
@@ -602,8 +733,9 @@ ${fieldsString}
                                                 />
                                             </div>
                                         </div>
+                                    )}
 
-                                        {/* Ingested At Range */}
+                                    {activeFilters.timestamp && (
                                         <div className="space-y-1">
                                             <Label className="text-xs">Ingested At Range (Unix timestamps)</Label>
                                             <div className="grid grid-cols-2 gap-2">
@@ -629,8 +761,139 @@ ${fieldsString}
                                                 />
                                             </div>
                                         </div>
-                                    </div>
-                                )}
+                                    )}
+
+                                    {activeFilters.tags && (
+                                        <div className="space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <Label className="text-xs">Tag Filters</Label>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-6 px-2 text-xs"
+                                                    onClick={() => {
+                                                        setFilters(prev => ({
+                                                            ...prev,
+                                                            tags: [...(prev.tags || []), {
+                                                                name: '',
+                                                                values: [''],
+                                                                op: 'EQ' as const,
+                                                                match: 'EXACT' as const
+                                                            }]
+                                                        }))
+                                                    }}
+                                                >
+                                                    Add Tag
+                                                </Button>
+                                            </div>
+                                            {filters.tags?.map((tag, tagIndex) => (
+                                                <div key={tagIndex} className="border border-border rounded-md p-2 space-y-2">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-xs font-medium">Tag {tagIndex + 1}</span>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="h-5 w-5 p-0 text-xs hover:bg-destructive/20"
+                                                            onClick={() => {
+                                                                setFilters(prev => ({
+                                                                    ...prev,
+                                                                    tags: prev.tags?.filter((_, i) => i !== tagIndex)
+                                                                }))
+                                                            }}
+                                                        >
+                                                            ×
+                                                        </Button>
+                                                    </div>
+
+                                                    <div className="space-y-1">
+                                                        <Label className="text-xs">Tag Name</Label>
+                                                        <Input
+                                                            placeholder="e.g., App-Name, Content-Type"
+                                                            value={tag.name}
+                                                            onChange={(e) => {
+                                                                setFilters(prev => ({
+                                                                    ...prev,
+                                                                    tags: prev.tags?.map((t, i) =>
+                                                                        i === tagIndex ? { ...t, name: e.target.value } : t
+                                                                    )
+                                                                }))
+                                                            }}
+                                                            className="text-xs font-mono"
+                                                        />
+                                                    </div>
+
+                                                    <div className="space-y-1">
+                                                        <Label className="text-xs">Tag Values (comma-separated)</Label>
+                                                        <Input
+                                                            placeholder="value1,value2,value3"
+                                                            value={tag.values.join(',')}
+                                                            onChange={(e) => {
+                                                                const values = e.target.value.split(',').map(v => v.trim()).filter(Boolean)
+                                                                setFilters(prev => ({
+                                                                    ...prev,
+                                                                    tags: prev.tags?.map((t, i) =>
+                                                                        i === tagIndex ? { ...t, values: values.length > 0 ? values : [''] } : t
+                                                                    )
+                                                                }))
+                                                            }}
+                                                            className="text-xs font-mono"
+                                                        />
+                                                    </div>
+
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        <div className="space-y-1">
+                                                            <Label className="text-xs">Operation</Label>
+                                                            <Select
+                                                                value={tag.op || 'EQ'}
+                                                                onValueChange={(value: 'EQ' | 'NEQ') => {
+                                                                    setFilters(prev => ({
+                                                                        ...prev,
+                                                                        tags: prev.tags?.map((t, i) =>
+                                                                            i === tagIndex ? { ...t, op: value } : t
+                                                                        )
+                                                                    }))
+                                                                }}
+                                                            >
+                                                                <SelectTrigger className="text-xs">
+                                                                    <SelectValue />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    <SelectItem value="EQ">Equals (EQ)</SelectItem>
+                                                                    <SelectItem value="NEQ">Not Equals (NEQ)</SelectItem>
+                                                                </SelectContent>
+                                                            </Select>
+                                                        </div>
+
+                                                        <div className="space-y-1">
+                                                            <Label className="text-xs">Match Type</Label>
+                                                            <Select
+                                                                value={tag.match || 'EXACT'}
+                                                                onValueChange={(value: 'EXACT' | 'WILDCARD' | 'FUZZY_AND' | 'FUZZY_OR') => {
+                                                                    setFilters(prev => ({
+                                                                        ...prev,
+                                                                        tags: prev.tags?.map((t, i) =>
+                                                                            i === tagIndex ? { ...t, match: value } : t
+                                                                        )
+                                                                    }))
+                                                                }}
+                                                            >
+                                                                <SelectTrigger className="text-xs">
+                                                                    <SelectValue />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    <SelectItem value="EXACT">Exact</SelectItem>
+                                                                    <SelectItem value="WILDCARD">Wildcard</SelectItem>
+                                                                    <SelectItem value="FUZZY_AND">Fuzzy AND</SelectItem>
+                                                                    <SelectItem value="FUZZY_OR">Fuzzy OR</SelectItem>
+                                                                </SelectContent>
+                                                            </Select>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
                             </CardContent>
                         </Card>
                     )}
@@ -638,11 +901,14 @@ ${fieldsString}
                     <Separator />
 
                     {/* Field Selection */}
-                    <Card className="p-3">
-                        <CardHeader className="px-0 pt-0 pb-3">
-                            <CardTitle className="text-sm">Select Fields</CardTitle>
+                    <Card className="p-3 gap-2">
+                        <CardHeader className="p-0">
+                            <CardTitle className="text-sm p-0 flex items-center gap-2">
+                                <KeyIcon className="w-4 h-4" />
+                                Result Fields
+                            </CardTitle>
                         </CardHeader>
-                        <CardContent className="px-0 pb-0 space-y-3">
+                        <CardContent className="p-0 m-0 space-y-3">
                             {queryType === 'transactions' && (
                                 <>
                                     {/* Connection level fields */}
