@@ -396,16 +396,14 @@ export default function Settings() {
             projects.actions.setProject(updatedProject)
             toast.success("New process spawned successfully")
 
-            // Close dialog after successful spawn
-            setTimeout(() => {
-                setIsProcessDialogOpen(false)
-                setProcessEditMode(null)
-                // Reset custom tags state
-                setCustomTags([])
-                setNewTagName("")
-                setNewTagValue("")
-                setTagErrors([])
-            }, 1500) // Delay to show success message
+            // Close dialog immediately after successful spawn
+            setIsProcessDialogOpen(false)
+            setProcessEditMode(null)
+            // Reset custom tags state
+            setCustomTags([])
+            setNewTagName("")
+            setNewTagValue("")
+            setTagErrors([])
 
         } catch (error) {
             console.error("Failed to spawn process:", error)
@@ -573,16 +571,14 @@ export default function Settings() {
             projects.actions.setFile(activeProject.name, updatedFile)
             toast.success(`New process spawned for ${selectedFileName}`)
 
-            // Close dialog after successful spawn
-            setTimeout(() => {
-                setFileProcessDialogOpen(false)
-                setFileProcessEditMode(null)
-                // Reset file-specific state
-                setFileCustomTags([])
-                setFileNewTagName("")
-                setFileNewTagValue("")
-                setFileTagErrors([])
-            }, 1500) // Delay to show success message
+            // Close dialog immediately after successful spawn
+            setFileProcessDialogOpen(false)
+            setFileProcessEditMode(null)
+            // Reset file-specific state
+            setFileCustomTags([])
+            setFileNewTagName("")
+            setFileNewTagValue("")
+            setFileTagErrors([])
 
         } catch (error) {
             console.error("Failed to spawn file process:", error)

@@ -253,19 +253,17 @@ export default function NewProject() {
 
             setSuccessMessage(`Project "${projectName.trim()}" created successfully!`)
 
-            // Close dialog and reset form after a short delay to show success message
-            setTimeout(() => {
-                setIsDialogOpen(false)
-                setProjectName("")
-                setExistingProcessId("")
-                setCustomModuleId("")
-                setCustomTags([])
-                setNewTagName("")
-                setNewTagValue("")
-                setErrors([])
-                setSuccessMessage("")
-                setGeneralError("")
-            }, 1500)
+            // Close dialog and reset form immediately after successful creation
+            setIsDialogOpen(false)
+            setProjectName("")
+            setExistingProcessId("")
+            setCustomModuleId("")
+            setCustomTags([])
+            setNewTagName("")
+            setNewTagValue("")
+            setErrors([])
+            setSuccessMessage("")
+            setGeneralError("")
 
         } catch (error) {
             Logger.error('Failed to create project', error)

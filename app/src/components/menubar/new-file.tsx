@@ -349,21 +349,19 @@ export default function NewFile() {
 
             setSuccessMessage(`File "${fullFileName}" created successfully!`)
 
-            // Close dialog and reset form after a short delay to show success message
-            setTimeout(() => {
-                setIsDialogOpen(false)
-                setFileName("")
-                setFileType("lua")
-                setProcessOption("default")
-                setCustomProcessId("")
-                setCustomTags([])
-                setNewTagName("")
-                setNewTagValue("")
-                setTagErrors([])
-                setErrors([])
-                setSuccessMessage("")
-                setGeneralError("")
-            }, 1500)
+            // Close dialog and reset form immediately after successful creation
+            setIsDialogOpen(false)
+            setFileName("")
+            setFileType("lua")
+            setProcessOption("default")
+            setCustomProcessId("")
+            setCustomTags([])
+            setNewTagName("")
+            setNewTagValue("")
+            setTagErrors([])
+            setErrors([])
+            setSuccessMessage("")
+            setGeneralError("")
 
         } catch (error) {
             Logger.error('Failed to create file', error)
