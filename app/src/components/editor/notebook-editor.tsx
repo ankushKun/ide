@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import { OutputViewer } from "@/components/ui/output-viewer";
 import { createSigner } from "@permaweb/aoconnect";
 import { useTerminal } from "@/hooks/use-terminal";
+import { vimManager } from "@/lib/vim-manager";
 
 // Use the Cell interface from use-projects.ts
 type NotebookCell = Cell & {
@@ -89,12 +90,51 @@ const CodeCell: React.FC<CodeCellProps> = ({
     // Refs to store Monaco instances for theme updates
     const monacoRef = useRef<typeof import("monaco-editor") | null>(null);
     const diffEditorRef = useRef<editor.IStandaloneDiffEditor | null>(null);
+    const vimModeRef = useRef<any>(null);
 
     // Store model for this cell to maintain separate undo/redo history
     const modelRef = useRef<editor.ITextModel | null>(null);
 
     // Track component mounting state to prevent operations on unmounting components
     const isMountedRef = useRef(true);
+
+    // Helper function to initialize vim mode properly
+    const initializeVimMode = useCallback(async (editor: editor.IStandaloneCodeEditor | editor.IStandaloneDiffEditor) => {
+        if (!vimManager.isVimModeEnabled()) return;
+
+        const notebookId = `notebook-${project.name}`;
+        const editorId = `notebook-cell-${cellId}`;
+
+        await vimManager.initializeNotebookVimMode(notebookId, editorId, editor, (vimInstance) => {
+            vimModeRef.current = vimInstance;
+        });
+
+        // Set up focus handlers to manage active vim instance
+        // Only IStandaloneCodeEditor has getDomNode method
+        const codeEditor = editor as editor.IStandaloneCodeEditor;
+        if (codeEditor.getDomNode) {
+            const editorDomNode = codeEditor.getDomNode();
+            if (editorDomNode) {
+                const handleFocus = () => vimManager.onEditorFocus(editorId);
+                const handleBlur = () => vimManager.onEditorBlur(editorId);
+
+                editorDomNode.addEventListener('focus', handleFocus, true);
+                editorDomNode.addEventListener('blur', handleBlur, true);
+
+                // Store cleanup function
+                const cleanup = () => {
+                    editorDomNode.removeEventListener('focus', handleFocus, true);
+                    editorDomNode.removeEventListener('blur', handleBlur, true);
+                };
+
+                // Store cleanup in ref for later use
+                if (!vimModeRef.current) {
+                    vimModeRef.current = {};
+                }
+                vimModeRef.current.cleanup = cleanup;
+            }
+        }
+    }, [cellId]);
 
     const runCellCode = async () => {
         console.log("running cell code", cellId);
@@ -231,6 +271,19 @@ const CodeCell: React.FC<CodeCellProps> = ({
             // Mark component as unmounted to prevent further operations
             isMountedRef.current = false;
 
+            // Cleanup vim mode using the global manager
+            const editorId = `notebook-cell-${cellId}`;
+            vimManager.disposeVimInstance(editorId);
+
+            // Cleanup focus handlers if they exist
+            if (vimModeRef.current && typeof vimModeRef.current.cleanup === 'function') {
+                try {
+                    vimModeRef.current.cleanup();
+                } catch (error) {
+                    console.warn("Failed to cleanup vim focus handlers:", error);
+                }
+            }
+
             // Unregister Monaco instance first to prevent theme changes
             if (monacoRef.current) {
                 unregisterMonacoInstance(monacoRef.current);
@@ -239,6 +292,7 @@ const CodeCell: React.FC<CodeCellProps> = ({
             if (diffEditorRef.current) {
                 diffEditorRef.current = null;
             }
+            vimModeRef.current = null;
 
             // Dispose the model when component unmounts
             if (modelRef.current) {
@@ -373,6 +427,9 @@ const CodeCell: React.FC<CodeCellProps> = ({
                                             document.getElementById(`reject-changes-btn-${cellId}`)?.click();
                                         }
                                     });
+
+                                    // Initialize vim mode if enabled
+                                    initializeVimMode(editor);
                                 }}
                             />
                         </>
@@ -432,6 +489,9 @@ const CodeCell: React.FC<CodeCellProps> = ({
                                         }
                                     },
                                 });
+
+                                // Initialize vim mode if enabled
+                                initializeVimMode(editor);
                             }}
                             height={
                                 expand ? Math.max(cell.code.split("\n").length * 20, 60) :
@@ -492,6 +552,7 @@ const VisualCell: React.FC<VisualCellProps> = ({
 
     // Refs to store Monaco instances for theme updates
     const monacoRef = useRef<typeof import("monaco-editor") | null>(null);
+    const vimModeRef = useRef<any>(null);
 
     // Store model for this cell to maintain separate undo/redo history
     const modelRef = useRef<editor.ITextModel | null>(null);
@@ -520,6 +581,44 @@ const VisualCell: React.FC<VisualCellProps> = ({
             console.warn("Failed to apply Monaco theme:", error);
         }
     }, [isDarkTheme]);
+
+    // Helper function to initialize vim mode properly
+    const initializeVimMode = useCallback(async (editor: editor.IStandaloneCodeEditor | editor.IStandaloneDiffEditor) => {
+        if (!vimManager.isVimModeEnabled()) return;
+
+        const notebookId = `notebook-${project.name}`;
+        const editorId = `notebook-visual-cell-${cellId}`;
+
+        await vimManager.initializeNotebookVimMode(notebookId, editorId, editor, (vimInstance) => {
+            vimModeRef.current = vimInstance;
+        });
+
+        // Set up focus handlers to manage active vim instance
+        // Only IStandaloneCodeEditor has getDomNode method
+        const codeEditor = editor as editor.IStandaloneCodeEditor;
+        if (codeEditor.getDomNode) {
+            const editorDomNode = codeEditor.getDomNode();
+            if (editorDomNode) {
+                const handleFocus = () => vimManager.onEditorFocus(editorId);
+                const handleBlur = () => vimManager.onEditorBlur(editorId);
+
+                editorDomNode.addEventListener('focus', handleFocus, true);
+                editorDomNode.addEventListener('blur', handleBlur, true);
+
+                // Store cleanup function
+                const cleanup = () => {
+                    editorDomNode.removeEventListener('focus', handleFocus, true);
+                    editorDomNode.removeEventListener('blur', handleBlur, true);
+                };
+
+                // Store cleanup in ref for later use
+                if (!vimModeRef.current) {
+                    vimModeRef.current = {};
+                }
+                vimModeRef.current.cleanup = cleanup;
+            }
+        }
+    }, [cellId]);
 
     // Helper function to get or create a model for this cell
     const getOrCreateVisualCellModel = useCallback((monaco: typeof import("monaco-editor"), content: string, language: string) => {
@@ -603,9 +702,23 @@ const VisualCell: React.FC<VisualCellProps> = ({
             // Mark component as unmounted to prevent further operations
             isMountedRef.current = false;
 
+            // Cleanup vim mode using the global manager
+            const editorId = `notebook-visual-cell-${cellId}`;
+            vimManager.disposeVimInstance(editorId);
+
+            // Cleanup focus handlers if they exist
+            if (vimModeRef.current && typeof vimModeRef.current.cleanup === 'function') {
+                try {
+                    vimModeRef.current.cleanup();
+                } catch (error) {
+                    console.warn("Failed to cleanup vim focus handlers:", error);
+                }
+            }
+
             if (monacoRef.current) {
                 unregisterMonacoInstance(monacoRef.current);
             }
+            vimModeRef.current = null;
             // Dispose the model when component unmounts
             if (modelRef.current) {
                 try {
@@ -708,6 +821,9 @@ const VisualCell: React.FC<VisualCellProps> = ({
                                 onUpdateCell(cellId, { editing: false });
                             });
                             editor.focus();
+
+                            // Initialize vim mode if enabled
+                            initializeVimMode(editor);
                         }}
                         height={
                             expand ? Math.max(cell.code.split("\n").length * 20, 60) :

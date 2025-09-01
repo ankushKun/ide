@@ -6,6 +6,7 @@ import { editor } from "monaco-editor";
 import { useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import notebookTheme from "@/assets/themes/notebook.json";
+import { vimManager } from "@/lib/vim-manager";
 
 const monacoConfig: editor.IStandaloneEditorConstructionOptions = {
     fontFamily: '"DM Mono", monospace',
@@ -82,6 +83,7 @@ export default function SingleFileEditor() {
     const monacoRef = useRef<typeof import("monaco-editor") | null>(null);
     const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
     const diffEditorRef = useRef<editor.IStandaloneDiffEditor | null>(null);
+    const vimModeRef = useRef<any>(null);
 
     // Store models for each file to maintain separate undo/redo history
     const modelsRef = useRef<Map<string, editor.ITextModel>>(new Map());
@@ -186,6 +188,43 @@ export default function SingleFileEditor() {
         }
     }, [isDarkTheme]);
 
+    // Helper function to initialize vim mode properly
+    const initializeVimMode = useCallback(async (editor: editor.IStandaloneCodeEditor | editor.IStandaloneDiffEditor) => {
+        if (!vimManager.isVimModeEnabled()) return;
+
+        const editorId = `single-file-${activeFile}`;
+
+        await vimManager.initializeVimMode(editorId, editor, (vimInstance) => {
+            vimModeRef.current = vimInstance;
+        });
+
+        // Set up focus handlers to manage active vim instance
+        // Only IStandaloneCodeEditor has getDomNode method
+        const codeEditor = editor as editor.IStandaloneCodeEditor;
+        if (codeEditor.getDomNode) {
+            const editorDomNode = codeEditor.getDomNode();
+            if (editorDomNode) {
+                const handleFocus = () => vimManager.onEditorFocus(editorId);
+                const handleBlur = () => vimManager.onEditorBlur(editorId);
+
+                editorDomNode.addEventListener('focus', handleFocus, true);
+                editorDomNode.addEventListener('blur', handleBlur, true);
+
+                // Store cleanup function
+                const cleanup = () => {
+                    editorDomNode.removeEventListener('focus', handleFocus, true);
+                    editorDomNode.removeEventListener('blur', handleBlur, true);
+                };
+
+                // Store cleanup in ref for later use
+                if (!vimModeRef.current) {
+                    vimModeRef.current = {};
+                }
+                vimModeRef.current.cleanup = cleanup;
+            }
+        }
+    }, [activeFile]);
+
     useEffect(() => {
         function handleKeyDown(e: KeyboardEvent) {
             if (e.metaKey && e.key == "Enter") {
@@ -256,13 +295,56 @@ export default function SingleFileEditor() {
         }
     }, [activeFile, file, getOrCreateFileModel]);
 
+    // Handle vim cleanup when activeFile changes
+    useEffect(() => {
+        return () => {
+            // Cleanup vim mode for the previous file when activeFile changes
+            if (activeFile) {
+                const editorId = `single-file-${activeFile}`;
+                vimManager.disposeVimInstance(editorId);
+            }
+        };
+    }, [activeFile]);
+
+    // Re-initialize vim mode when activeFile changes
+    useEffect(() => {
+        if (editorRef.current && activeFile && vimManager.isVimModeEnabled()) {
+            console.log(`Re-initializing vim mode for file: ${activeFile}`);
+
+            // Small delay to ensure model switching is complete
+            const timeoutId = setTimeout(() => {
+                if (editorRef.current && activeFile) {
+                    console.log(`Executing vim re-initialization for: ${activeFile}`);
+                    initializeVimMode(editorRef.current).catch(error => {
+                        console.warn("Failed to initialize vim mode for new file:", error);
+                    });
+                }
+            }, 50);
+
+            return () => clearTimeout(timeoutId);
+        }
+    }, [activeFile, initializeVimMode]);
+
     // Cleanup models on unmount
     useEffect(() => {
         return () => {
+            // Cleanup all single-file vim instances
+            vimManager.disposeInstancesByPrefix('single-file-');
+
+            // Cleanup focus handlers if they exist
+            if (vimModeRef.current && typeof vimModeRef.current.cleanup === 'function') {
+                try {
+                    vimModeRef.current.cleanup();
+                } catch (error) {
+                    console.warn("Failed to cleanup vim focus handlers:", error);
+                }
+            }
+
             // Clear Monaco references first to prevent theme changes
             monacoRef.current = null;
             editorRef.current = null;
             diffEditorRef.current = null;
+            vimModeRef.current = null;
 
             // Dispose all models when component unmounts
             modelsRef.current.forEach((model, fileName) => {
@@ -393,24 +475,8 @@ export default function SingleFileEditor() {
                         }
                     })
 
-                    const vimMode = localStorage.getItem("vimMode") == "true"
-                    if (vimMode) {
-                        console.log("vimMode", vimMode)
-                        // setup monaco-vim
-                        // @ts-ignore
-                        window.require.config({
-                            paths: {
-                                "monaco-vim": "https://unpkg.com/monaco-vim/dist/monaco-vim"
-                            }
-                        });
-
-                        // @ts-ignore
-                        window.require(["monaco-vim"], function (MonacoVim) {
-                            const statusNode = document.querySelector(`#vim-status`);
-                            const vim = MonacoVim.initVimMode(editor, statusNode)
-                            console.log(vim)
-                        });
-                    }
+                    // Initialize vim mode if enabled
+                    initializeVimMode(editor);
                 }}
                 original={file.cells?.[file.cellOrder[0]]?.content || ""}
                 modified={(file as any).diffNew || ""}
@@ -462,24 +528,8 @@ export default function SingleFileEditor() {
                         monaco.editor.remeasureFonts();
                     }, 100);
 
-                    const vimMode = localStorage.getItem("vimMode") == "true"
-                    if (vimMode) {
-                        console.log("vimMode", vimMode)
-                        // setup monaco-vim
-                        // @ts-ignore
-                        window.require.config({
-                            paths: {
-                                "monaco-vim": "https://unpkg.com/monaco-vim/dist/monaco-vim"
-                            }
-                        });
-
-                        // @ts-ignore
-                        window.require(["monaco-vim"], function (MonacoVim) {
-                            const statusNode = document.querySelector(`#vim-status`);
-                            const vim = MonacoVim.initVimMode(editor, statusNode)
-                            console.log(vim)
-                        });
-                    }
+                    // Initialize vim mode if enabled
+                    initializeVimMode(editor);
 
                     // run function on shift+enter
                     editor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.Enter, () => {

@@ -187,6 +187,7 @@ export default function Settings() {
 
     const handleVimModeChange = (enabled: boolean) => {
         settings.actions.setVimMode(enabled)
+        localStorage.setItem("betteridea-vim-mode", enabled.toString())
         toast.success(`VIM mode ${enabled ? "enabled" : "disabled"}`)
     }
 

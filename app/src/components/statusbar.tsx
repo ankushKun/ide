@@ -256,6 +256,7 @@ export default function Statusbar() {
                 </span>
             </Button>
             <ThemeToggleButton className="w-6 pb-0.5 scale-80 items-center justify-center rounded-none" />
+            <div id="vim-status" className="ml-2"></div>
 
             {/* Right Section - Performance and Version */}
             <div className="grow"></div>
